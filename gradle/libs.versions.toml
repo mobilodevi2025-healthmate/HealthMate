@@ -1,6 +1,5 @@
 [versions]
-# --- Temel Sürümler ---
-agp = "8.7.3" # Stabil sürüme çektim (8.9.x henüz stabil değilse hata verebilir, 8.7.3 güvenlidir)
+agp = "8.7.3"
 kotlin = "2.0.21"
 coreKtx = "1.15.0"
 junit = "4.13.2"
@@ -10,13 +9,11 @@ lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.09.00"
 
-# --- Kritik Bağımlılıklar (Kotlin 2.0.21 Uyumu) ---
-# KSP Sürümü: Kotlin sürümüyle (2.0.21) başlamak ZORUNDADIR.
 ksp = "2.0.21-1.0.25"
 hilt = "2.51.1"
 room = "2.6.1"
+hiltNavigationCompose = "1.2.0"
 
-# --- Diğer Kütüphaneler ---
 retrofit = "2.9.0"
 okhttp = "4.12.0"
 navigationCompose = "2.8.0"
@@ -45,6 +42,7 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 # --- Hilt (Dependency Injection) ---
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 
 # --- Navigation ---
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
@@ -70,7 +68,5 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-# Hilt Plugin
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
-# KSP Plugin
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
