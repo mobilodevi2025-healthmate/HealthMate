@@ -1,19 +1,22 @@
 [versions]
-# --- Mevcut Sürümlerin (Korundu) ---
-agp = "8.9.2"
+# --- Temel Sürümler ---
+agp = "8.7.3" # Stabil sürüme çektim (8.9.x henüz stabil değilse hata verebilir, 8.7.3 güvenlidir)
 kotlin = "2.0.21"
-coreKtx = "1.15.0" # Stabil sürüme güncellendi (1.17.0 henüz stabil olmayabilir, 1.15.0 güvenlidir)
+coreKtx = "1.15.0"
 junit = "4.13.2"
-junitVersion = "1.2.1" # Stabil sürüme sabitlendi
-espressoCore = "3.6.1" # Stabil sürüme sabitlendi
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.8.7"
-activityCompose = "1.9.3" # Stabil uyumlu sürüm
+activityCompose = "1.9.3"
 composeBom = "2024.09.00"
 
-# --- PROJE İÇİN EKLENEN YENİ SÜRÜMLER ---
-# KSP: Kotlin 2.0.21 ile tam uyumlu sürüm olmalı
+# --- Kritik Bağımlılıklar (Kotlin 2.0.21 Uyumu) ---
+# KSP Sürümü: Kotlin sürümüyle (2.0.21) başlamak ZORUNDADIR.
 ksp = "2.0.21-1.0.25"
+hilt = "2.51.1"
 room = "2.6.1"
+
+# --- Diğer Kütüphaneler ---
 retrofit = "2.9.0"
 okhttp = "4.12.0"
 navigationCompose = "2.8.0"
@@ -21,11 +24,8 @@ coil = "2.7.0"
 workManager = "2.9.1"
 
 [libraries]
-# --- Varsayılan Kütüphaneler ---
+# --- Android Core ---
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -37,31 +37,40 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 
-# --- EKİP PROJESİ İÇİN EKLENENLER ---
+# --- Test ---
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 
-# 1. Navigation (Sayfalar Arası Geçiş)
+# --- Hilt (Dependency Injection) ---
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+
+# --- Navigation ---
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
-# 2. Room Database (Yerel Veritabanı)
+# --- Room Database ---
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
-# 3. Retrofit & Network (API Bağlantısı)
+# --- Retrofit & Network ---
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 
-# 4. Coil (Resim Yükleme)
+# --- Coil (Image Loading) ---
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
-# 5. WorkManager (Arka Plan İşlemleri)
+# --- WorkManager ---
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-# Room Derleyicisi için KSP Plugin (Zorunlu)
+# Hilt Plugin
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+# KSP Plugin
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
