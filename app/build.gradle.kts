@@ -2,14 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-
-    // Room için KSP
     alias(libs.plugins.ksp)
-
-    // Hilt için Plugin
     alias(libs.plugins.hilt)
-
-    // Hilt derleyicisi (Annotation Processor) için KAPT gereklidir
     id("kotlin-kapt")
 }
 
@@ -59,19 +53,21 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // --- HILT (DEPENDENCY INJECTION) - KRİTİK BÖLÜM ---
+    // --- HILT (DEPENDENCY INJECTION) ---
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler) // Hilt için kapt kullanıyoruz (En kararlı yöntem)
+    kapt(libs.hilt.compiler)
+    // EKLENDİ: hiltViewModel() fonksiyonunu tanıması için gerekli satır
+    implementation(libs.androidx.hilt.navigation.compose)
 
     // --- DİĞER EKLENTİLER ---
 
     // 1. Navigation
     implementation(libs.androidx.navigation.compose)
 
-    // 2. Room Database (Veritabanı)
+    // 2. Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler) // Room için KSP kullanıyoruz (Kotlin 2.0 ile uyumlu)
+    ksp(libs.androidx.room.compiler)
 
     // 3. Retrofit & Network
     implementation(libs.retrofit)
@@ -79,13 +75,13 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
 
-    // 4. Coil (Resim Yükleme)
+    // 4. Coil
     implementation(libs.coil.compose)
 
     // 5. WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
-    // --- Test Kütüphaneleri ---
+    // --- Test ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
