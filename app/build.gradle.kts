@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     id("kotlin-kapt")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -43,7 +44,6 @@ android {
 }
 
 dependencies {
-    // --- Varsayılan Android Kütüphaneleri ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -52,38 +52,24 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-
-    // --- HILT (DEPENDENCY INJECTION) ---
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
-    // EKLENDİ: hiltViewModel() fonksiyonunu tanıması için gerekli satır
     implementation(libs.androidx.hilt.navigation.compose)
-
-    // --- DİĞER EKLENTİLER ---
-
-    // 1. Navigation
     implementation(libs.androidx.navigation.compose)
-
-    // 2. Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
-    // 3. Retrofit & Network
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
-
-    // 4. Coil
     implementation(libs.coil.compose)
-
-    // 5. WorkManager
     implementation(libs.androidx.work.runtime.ktx)
-
     implementation("androidx.datastore:datastore-preferences:1.0.0")
-
-    // --- Test ---
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
