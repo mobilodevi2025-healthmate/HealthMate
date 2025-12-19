@@ -19,51 +19,81 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class UserPreferencesManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-
     companion object {
-        val USER_HEIGHT = intPreferencesKey("user_height") // cm
-        val USER_WEIGHT = intPreferencesKey("user_weight") // kg
+        val USER_NAME = stringPreferencesKey("user_name")
+        val USER_HEIGHT = intPreferencesKey("user_height")
+        val USER_WEIGHT = intPreferencesKey("user_weight")
         val USER_AGE = intPreferencesKey("user_age")
+        val USER_GENDER = stringPreferencesKey("user_gender")
+
+        val GOAL_TYPE = stringPreferencesKey("goal_type") // "LOSE_WEIGHT", "GAIN_WEIGHT", "MAINTAIN"
+        val ACTIVITY_LEVEL = stringPreferencesKey("activity_level") // "SEDENTARY", "ACTIVE", etc.
         val DAILY_STEP_GOAL = intPreferencesKey("daily_step_goal")
         val DAILY_CALORIE_GOAL = intPreferencesKey("daily_calorie_goal")
-        val USER_NAME = stringPreferencesKey("user_name")
+
+        val IS_FIRST_RUN = androidx.datastore.preferences.core.booleanPreferencesKey("is_first_run")
     }
 
-    suspend fun saveUserProfile(
-        name: String,
-        height: Int,
-        weight: Int,
-        age: Int,
-        stepGoal: Int,
-        calorieGoal: Int
-    ) {
-        context.dataStore.edit { preferences ->
-            preferences[USER_NAME] = name
-            preferences[USER_HEIGHT] = height
-            preferences[USER_WEIGHT] = weight
-            preferences[USER_AGE] = age
-            preferences[DAILY_STEP_GOAL] = stepGoal
-            preferences[DAILY_CALORIE_GOAL] = calorieGoal
+    val userData: Flow<UserFullData> = context.dataStore.data.map { preferences ->
+        UserFullData(
+            isFirstRun = preferences[IS_FIRST_RUN] ?: true,
+            profile = UserProfile(
+                name = preferences[USER_NAME] ?: "",
+                height = preferences[USER_HEIGHT] ?: 170,
+                weight = preferences[USER_WEIGHT] ?: 70,
+                age = preferences[USER_AGE] ?: 25,
+                gender = preferences[USER_GENDER] ?: "Erkek"
+            ),
+            goals = UserGoals(
+                goalType = preferences[GOAL_TYPE] ?: "MAINTAIN",
+                activityLevel = preferences[ACTIVITY_LEVEL] ?: "MODERATE",
+                stepGoal = preferences[DAILY_STEP_GOAL] ?: 5000,
+                calorieGoal = preferences[DAILY_CALORIE_GOAL] ?: 2000
+            )
+        )
+    }
+
+    suspend fun completeOnboarding() {
+        context.dataStore.edit { it[IS_FIRST_RUN] = false }
+    }
+
+    suspend fun saveProfile(profile: UserProfile) {
+        context.dataStore.edit { prefs ->
+            prefs[USER_NAME] = profile.name
+            prefs[USER_HEIGHT] = profile.height
+            prefs[USER_WEIGHT] = profile.weight
+            prefs[USER_AGE] = profile.age
+            prefs[USER_GENDER] = profile.gender
         }
     }
 
-    val userData: Flow<UserProfile> = context.dataStore.data.map { preferences ->
-        UserProfile(
-            name = preferences[USER_NAME] ?: "Kullanıcı",
-            height = preferences[USER_HEIGHT] ?: 170, // Varsayılan: 170cm
-            weight = preferences[USER_WEIGHT] ?: 70,  // Varsayılan: 70kg
-            age = preferences[USER_AGE] ?: 25,        // Varsayılan: 25 yaş
-            stepGoal = preferences[DAILY_STEP_GOAL] ?: 5000, // Varsayılan hedef
-            calorieGoal = preferences[DAILY_CALORIE_GOAL] ?: 2000 // Varsayılan hedef
-        )
+    suspend fun saveGoals(goals: UserGoals) {
+        context.dataStore.edit { prefs ->
+            prefs[GOAL_TYPE] = goals.goalType
+            prefs[ACTIVITY_LEVEL] = goals.activityLevel
+            prefs[DAILY_STEP_GOAL] = goals.stepGoal
+            prefs[DAILY_CALORIE_GOAL] = goals.calorieGoal
+        }
     }
 }
+
+data class UserFullData(
+    val isFirstRun: Boolean,
+    val profile: UserProfile,
+    val goals: UserGoals
+)
 
 data class UserProfile(
     val name: String,
     val height: Int,
     val weight: Int,
     val age: Int,
+    val gender: String
+)
+
+data class UserGoals(
+    val goalType: String,
+    val activityLevel: String,
     val stepGoal: Int,
     val calorieGoal: Int
 )
