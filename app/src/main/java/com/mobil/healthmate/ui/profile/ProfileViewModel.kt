@@ -49,10 +49,4 @@ class ProfileViewModel @Inject constructor(
             userPreferencesManager.saveGoals(newGoals)
         }
     }
-
-    fun completeSetup() {
-        viewModelScope.launch {
-            userPreferencesManager.completeOnboarding()
-        }
-    }
 }

@@ -104,9 +104,7 @@ fun ProfileScreen(
                 onClick = {
                     viewModel.saveBioProfile(name, height, weight, age, gender)
 
-                    viewModel.completeSetup()
-
-                    Toast.makeText(context, "Profil oluşturuldu!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Profil kaydedildi!", Toast.LENGTH_SHORT).show()
                     onNavigateBack()
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp)
