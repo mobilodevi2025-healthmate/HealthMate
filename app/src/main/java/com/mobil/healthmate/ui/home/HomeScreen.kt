@@ -1,23 +1,29 @@
-package com.mobil.healthmate.ui
+package com.mobil.healthmate.ui.home
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun HomeScreen(
     onNavigateToAddMeal: () -> Unit,
     onNavigateToMealList: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToGoals: () -> Unit
+    onNavigateToGoals: () -> Unit,
+    onSignOut: () -> Unit
 ) {
+    val user = FirebaseAuth.getInstance().currentUser
+    val userName = user?.displayName ?: user?.email?.substringBefore("@") ?: "Kullanıcı"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -37,7 +43,13 @@ fun HomeScreen(
             color = MaterialTheme.colorScheme.secondary
         )
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Merhaba, $userName 👋",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text("Günlük İşlemler", style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(8.dp))
@@ -82,6 +94,21 @@ fun HomeScreen(
                 onClick = onNavigateToGoals,
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        TextButton(
+            onClick = {
+                FirebaseAuth.getInstance().signOut()
+                onSignOut()
+            },
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Icon(Icons.Default.ExitToApp, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Çıkış Yap")
         }
     }
 }
