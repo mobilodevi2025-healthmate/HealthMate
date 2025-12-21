@@ -7,11 +7,16 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.mobil.healthmate.R
 
 @Composable
 fun HomeScreen(
@@ -21,6 +26,7 @@ fun HomeScreen(
     onNavigateToGoals: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val context = LocalContext.current
     val user = FirebaseAuth.getInstance().currentUser
     val userName = user?.displayName ?: user?.email?.substringBefore("@") ?: "Kullanıcı"
 
@@ -79,7 +85,6 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Profil Butonu
             MenuButton(
                 text = "Profil",
                 icon = Icons.Default.AccountCircle,
@@ -87,7 +92,6 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f)
             )
 
-            // Hedefler Butonu
             MenuButton(
                 text = "Hedefler",
                 icon = Icons.Default.DateRange,
@@ -97,10 +101,24 @@ fun HomeScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        // GÜNCELLENEN ÇIKIŞ BUTONU
         TextButton(
             onClick = {
-                FirebaseAuth.getInstance().signOut()
-                onSignOut()
+                // 1. Google İstemcisini Hazırla
+                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(context.getString(R.string.default_web_client_id))
+                    .requestEmail()
+                    .build()
+                val googleSignInClient = GoogleSignIn.getClient(context, gso)
+
+                // 2. Google'dan Çıkış Yap
+                googleSignInClient.signOut().addOnCompleteListener {
+                    // 3. Firebase'den Çıkış Yap
+                    FirebaseAuth.getInstance().signOut()
+                    // 4. Login Ekranına Yönlendir
+                    onSignOut()
+                }
             },
             colors = ButtonDefaults.textButtonColors(
                 contentColor = MaterialTheme.colorScheme.error
