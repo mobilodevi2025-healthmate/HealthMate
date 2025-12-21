@@ -20,4 +20,6 @@ interface HealthRepository {
 
     // --- SUMMARY ---
     fun getLast7DaysSummary(uid: String): Flow<List<DailySummaryEntity>>
+
+    suspend fun restoreUserProfileFromCloud(uid: String): Boolean
 }

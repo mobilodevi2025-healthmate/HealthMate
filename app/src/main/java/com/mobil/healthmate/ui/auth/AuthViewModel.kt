@@ -2,8 +2,8 @@ package com.mobil.healthmate.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.firestore.FirebaseFirestore
 import com.mobil.healthmate.domain.repository.AuthRepository
+import com.mobil.healthmate.domain.repository.HealthRepository // YENİ EKLENDİ
 import com.mobil.healthmate.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,26 +15,22 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val repository: AuthRepository,
-    private val firestore: FirebaseFirestore // AppModule'da tanımlıydı, buraya enjekte ediyoruz
+    private val authRepository: AuthRepository,
+    private val healthRepository: HealthRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthState())
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
-    // Init bloğunu kaldırdık veya değiştirdik.
-    // Çünkü uygulama açılış kontrolünü zaten MainActivity'de yapıyoruz.
-    // Login ekranına düştüyse sıfırdan giriş yapmalı.
-
     fun signIn(idToken: String) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
 
-            when (val result = repository.signInWithGoogle(idToken)) {
+            when (val result = authRepository.signInWithGoogle(idToken)) {
                 is Resource.Success -> {
                     val user = result.data
                     if (user != null) {
-                        checkUserInFirestore(user.uid)
+                        checkUserAndRestore(user.uid)
                     } else {
                         _state.update { it.copy(isLoading = false, error = "Kullanıcı bilgisi alınamadı") }
                     }
@@ -52,23 +48,26 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    private fun checkUserInFirestore(uid: String) {
-        firestore.collection("users").document(uid).get()
-            .addOnSuccessListener { document ->
-                val exists = document.exists()
+    private fun checkUserAndRestore(uid: String) {
+        viewModelScope.launch {
+            try {
+                val isRestored = healthRepository.restoreUserProfileFromCloud(uid)
 
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        user = repository.getCurrentUser(),
-                        isUserExisting = exists
+                        user = authRepository.getCurrentUser(),
+                        isUserExisting = isRestored // True ise Home, False ise CreateProfile
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Profil senkronizasyon hatası: ${e.localizedMessage}"
                     )
                 }
             }
-            .addOnFailureListener { e ->
-                _state.update {
-                    it.copy(isLoading = false, error = "Profil kontrolü başarısız: ${e.message}")
-                }
-            }
+        }
     }
 }
