@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mobil.healthmate.data.local.types.ActivityLevel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,19 +21,21 @@ fun GoalsScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val fullData by viewModel.userFullData.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
 
     var stepGoal by remember { mutableStateOf("") }
     var calorieGoal by remember { mutableStateOf("") }
-    var goalType by remember { mutableStateOf("Kilo Koru") }
-    var activityLevel by remember { mutableStateOf("Orta") }
+    var targetWeight by remember { mutableStateOf("") }
+    var selectedActivity by remember { mutableStateOf(ActivityLevel.MODERATELY_ACTIVE) }
 
-    LaunchedEffect(fullData) {
-        fullData?.goals?.let {
-            stepGoal = it.stepGoal.toString()
-            calorieGoal = it.calorieGoal.toString()
-            goalType = it.goalType
-            activityLevel = it.activityLevel
+    var isActivityExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState) {
+        if (!uiState.isLoading) {
+            if (stepGoal.isBlank()) stepGoal = uiState.dailyStepGoal
+            if (calorieGoal.isBlank()) calorieGoal = uiState.targetCalories
+            if (targetWeight.isBlank()) targetWeight = uiState.targetWeight
+            selectedActivity = uiState.activityLevel
         }
     }
 
@@ -57,25 +60,52 @@ fun GoalsScreen(
         ) {
             Text("Günlük Hedefleriniz", style = MaterialTheme.typography.titleMedium)
 
-            // Hedef Tipi
-            OutlinedTextField(
-                value = goalType,
-                onValueChange = { goalType = it },
-                label = { Text("Hedef (Kilo Ver/Al/Koru)") },
+            ExposedDropdownMenuBox(
+                expanded = isActivityExpanded,
+                onExpandedChange = { isActivityExpanded = !isActivityExpanded },
                 modifier = Modifier.fillMaxWidth()
-            )
-
-            // Aktivite
-            OutlinedTextField(
-                value = activityLevel,
-                onValueChange = { activityLevel = it },
-                label = { Text("Aktivite (Düşük/Orta/Yüksek)") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = selectedActivity.displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Aktivite Seviyesi") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isActivityExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = isActivityExpanded,
+                    onDismissRequest = { isActivityExpanded = false }
+                ) {
+                    ActivityLevel.entries.forEach { level ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(level.displayName, style = MaterialTheme.typography.bodyLarge)
+                                    // Katsayıyı küçük bilgi olarak gösterelim
+                                    Text("x${level.factor}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                }
+                            },
+                            onClick = {
+                                selectedActivity = level
+                                isActivityExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
 
             Divider()
 
             Text("Sayısal Hedefler", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+
+            OutlinedTextField(
+                value = targetWeight,
+                onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) targetWeight = it },
+                label = { Text("Hedef Kilo (kg)") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
 
             OutlinedTextField(
                 value = stepGoal,
@@ -97,7 +127,19 @@ fun GoalsScreen(
 
             Button(
                 onClick = {
-                    viewModel.saveStrategyGoals(goalType, activityLevel, stepGoal, calorieGoal)
+                    viewModel.onEvent(ProfileEvent.SaveProfile(
+                        name = uiState.name,
+                        age = uiState.age,
+                        height = uiState.height,
+                        weight = uiState.weight,
+                        gender = uiState.gender,
+
+                        activityLevel = selectedActivity,
+                        targetWeight = targetWeight,
+                        targetCalories = calorieGoal,
+                        dailyStepGoal = stepGoal
+                    ))
+
                     Toast.makeText(context, "Hedefler güncellendi!", Toast.LENGTH_SHORT).show()
                     onNavigateBack()
                 },

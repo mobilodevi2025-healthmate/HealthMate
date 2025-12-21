@@ -2,6 +2,7 @@ package com.mobil.healthmate.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.FirebaseFirestore
 import com.mobil.healthmate.domain.repository.AuthRepository
 import com.mobil.healthmate.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,18 +15,16 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val repository: AuthRepository
+    private val repository: AuthRepository,
+    private val firestore: FirebaseFirestore // AppModule'da tanımlıydı, buraya enjekte ediyoruz
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthState())
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
-    init {
-        val currentUser = repository.getCurrentUser()
-        if (currentUser != null) {
-            _state.update { it.copy(user = currentUser) }
-        }
-    }
+    // Init bloğunu kaldırdık veya değiştirdik.
+    // Çünkü uygulama açılış kontrolünü zaten MainActivity'de yapıyoruz.
+    // Login ekranına düştüyse sıfırdan giriş yapmalı.
 
     fun signIn(idToken: String) {
         viewModelScope.launch {
@@ -33,26 +32,43 @@ class AuthViewModel @Inject constructor(
 
             when (val result = repository.signInWithGoogle(idToken)) {
                 is Resource.Success -> {
-                    _state.update {
-                        it.copy(
-                            isLoading = false,
-                            user = result.data,
-                            error = null
-                        )
+                    val user = result.data
+                    if (user != null) {
+                        checkUserInFirestore(user.uid)
+                    } else {
+                        _state.update { it.copy(isLoading = false, error = "Kullanıcı bilgisi alınamadı") }
                     }
                 }
                 is Resource.Error -> {
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            error = result.message ?: "Bilinmeyen hata"
+                            error = result.message ?: "Giriş başarısız"
                         )
                     }
                 }
-                is Resource.Loading -> {
-                    // Loading durumu zaten yukarıda set edildi
-                }
+                is Resource.Loading -> {}
             }
         }
+    }
+
+    private fun checkUserInFirestore(uid: String) {
+        firestore.collection("users").document(uid).get()
+            .addOnSuccessListener { document ->
+                val exists = document.exists()
+
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        user = repository.getCurrentUser(),
+                        isUserExisting = exists
+                    )
+                }
+            }
+            .addOnFailureListener { e ->
+                _state.update {
+                    it.copy(isLoading = false, error = "Profil kontrolü başarısız: ${e.message}")
+                }
+            }
     }
 }

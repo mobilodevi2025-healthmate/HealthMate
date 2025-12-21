@@ -1,24 +1,40 @@
 package com.mobil.healthmate.ui.meal_list
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mobil.healthmate.data.local.MealEntity
+import com.mobil.healthmate.data.local.relation.MealWithFoods
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
-fun MealItem(meal: MealEntity) {
+fun MealItem(
+    mealWithFoods: MealWithFoods,
+    onDeleteClick: () -> Unit
+) {
+    val meal = mealWithFoods.meal
+    val foods = mealWithFoods.foods
+
+    val dateFormat = remember { SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()) }
+    val dateString = remember(meal.date) { dateFormat.format(Date(meal.date)) }
+
+    val totalProtein = remember(foods) {
+        foods.sumOf { it.protein }
+    }
+
+    val foodSummary = remember(foods) {
+        foods.joinToString(", ") { it.name }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -34,33 +50,51 @@ fun MealItem(meal: MealEntity) {
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Sol Taraf: Yemek İsmi ve Tarih
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = meal.name,
+                    text = meal.mealType.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
-                    text = meal.date.take(10), // Sadece YYYY-MM-DD kısmını gösterir
-                    style = MaterialTheme.typography.bodySmall,
+                    text = dateString,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // İçerik Özeti
+                if (foodSummary.isNotEmpty()) {
+                    Text(
+                        text = foodSummary,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            // Sağ Taraf: Kalori ve Protein
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "${meal.calorie} kcal",
+                    text = "${meal.totalCalories} kcal",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${meal.protein}g protein",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "${String.format("%.1f", totalProtein)}g prot",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
+                )
+            }
+
+            IconButton(onClick = onDeleteClick) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Sil",
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
         }
