@@ -23,11 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
-@OptIn(ExperimentalMaterial3Api::class) // TopAppBar kullanımı için gerekli izin
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MealListScreen(
     viewModel: MealListViewModel = hiltViewModel(),
-    onNavigateBack: () -> Unit // Geri dönüş fonksiyonunu parametre olarak alıyoruz
+    onNavigateBack: () -> Unit
 ) {
     val meals by viewModel.meals.collectAsState()
 
@@ -61,8 +61,13 @@ fun MealListScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(meals) { meal ->
-                        MealItem(meal = meal)
+                    items(meals) { mealWithFoods ->
+                        MealItem(
+                            mealWithFoods = mealWithFoods,
+                            onDeleteClick = {
+                                viewModel.deleteMeal(mealWithFoods)
+                            }
+                        )
                     }
                 }
             }
