@@ -21,10 +21,10 @@ class AuthRepositoryImpl @Inject constructor(
             if (result.user != null) {
                 Resource.Success(result.user!!)
             } else {
-                Resource.Error("Kullanıcı oluşturulamadı (User is null)")
+                Resource.Error("Kullanıcı oluşturulamadı")
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Bilinmeyen bir hata oluştu")
+            Resource.Error(e.localizedMessage ?: "Bilinmeyen bir hata oluştu")
         }
     }
 
