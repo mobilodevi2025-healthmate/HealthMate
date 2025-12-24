@@ -16,6 +16,7 @@ interface HealthRepository {
 
     fun getActiveGoal(uid: String): Flow<GoalEntity?>
     suspend fun insertGoal(goal: GoalEntity)
+    suspend fun insertSummary(summary: DailySummaryEntity)
 
     suspend fun insertMealWithFoods(meal: MealEntity, foods: List<FoodEntity>)
     suspend fun deleteMeal(meal: MealEntity)
