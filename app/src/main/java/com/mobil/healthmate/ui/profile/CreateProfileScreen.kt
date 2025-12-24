@@ -2,15 +2,29 @@ package com.mobil.healthmate.ui.profile
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.mobil.healthmate.data.local.types.Gender
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,8 +35,21 @@ fun CreateProfileScreen(
 ) {
     val context = LocalContext.current
 
+    // ViewModel'den resim yolunu dinliyoruz
+    val profileImagePath by viewModel.profileImagePath.collectAsState()
+
+    // Geri tuşunu engelle (Zorunlu alan)
     BackHandler {
         Toast.makeText(context, "Devam etmek için profil oluşturmalısınız.", Toast.LENGTH_SHORT).show()
+    }
+
+    // --- FOTOĞRAF SEÇİCİ (LAUNCHER) ---
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.onProfileImageSelected(uri)
+        }
     }
 
     // Form State
@@ -43,8 +70,67 @@ fun CreateProfileScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
                 .fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally // Ortalamak için eklendi
         ) {
+
+            // --- 1. PROFIL RESMİ ALANI (YENİ EKLENDİ) ---
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable {
+                        // Tıklanınca galeriyi aç
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (profileImagePath != null) {
+                    // Resim seçildiyse göster
+                    AsyncImage(
+                        model = profileImagePath,
+                        contentDescription = "Profil Resmi",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Seçilmediyse varsayılan ikon
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(60.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Küçük kalem ikonu (Edit Badge)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(12.dp)
+                        .size(24.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .padding(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Düzenle",
+                        tint = Color.White
+                    )
+                }
+            }
+
+            Text(
+                "Fotoğraf eklemek için tıklayın",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.outline
+            )
+
+            // --- MEVCUT FORM ALANLARI ---
+
             Text(
                 "HealthMate'e hoş geldiniz! Size özel bir plan oluşturabilmemiz için bilgilerinizi giriniz.",
                 style = MaterialTheme.typography.bodyMedium,
