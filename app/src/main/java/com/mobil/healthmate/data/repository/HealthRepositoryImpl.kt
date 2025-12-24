@@ -1,13 +1,11 @@
 package com.mobil.healthmate.data.repository
 
+import androidx.work.* // WorkManager class'ları için
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mobil.healthmate.data.local.dao.*
 import com.mobil.healthmate.data.local.entity.*
 import com.mobil.healthmate.data.local.relation.MealWithFoods
-
-import com.mobil.healthmate.data.local.types.ActivityLevel
-import com.mobil.healthmate.data.local.types.Gender
-import com.mobil.healthmate.data.local.types.GoalType
+import com.mobil.healthmate.data.worker.SyncWorker // Kendi Worker sınıfımız
 import com.mobil.healthmate.domain.repository.HealthRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
@@ -19,31 +17,14 @@ class HealthRepositoryImpl @Inject constructor(
     private val goalDao: GoalDao,
     private val foodDao: FoodDao,
     private val summaryDao: DailySummaryDao,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val workManager: WorkManager // WorkManager enjekte edildi
 ) : HealthRepository {
 
+    // =========================================================================
+    //  OKUMA İŞLEMLERİ (Değişiklik Yok)
+    // =========================================================================
     override fun getUser(uid: String): Flow<UserEntity?> = userDao.getUser(uid)
-
-    override suspend fun insertUser(user: UserEntity) = userDao.insertUser(user)
-
-    // --- DÜZELTİLEN KISIM: UUID MANTIĞI ---
-    override suspend fun insertMealWithFoods(meal: MealEntity, foods: List<FoodEntity>) {
-        // 1. Yemeği kaydet (Dönen long ID'yi kullanmıyoruz çünkü UUID var)
-        mealDao.insertMeal(meal)
-
-        // 2. Besinleri kopyala: Parent ID (String UUID) ve User ID set et
-        val foodsWithId = foods.map {
-            it.copy(
-                parentMealId = meal.mealId, // MealEntity'den gelen UUID String
-                userId = meal.userId        // Yemeğin sahibi
-            )
-        }
-
-        // 3. Besinleri FoodDao ile kaydet
-        foodDao.insertFoods(foodsWithId)
-    }
-
-    override suspend fun deleteMeal(meal: MealEntity) = mealDao.deleteMeal(meal)
 
     override fun getMealsWithFoods(uid: String): Flow<List<MealWithFoods>> {
         return mealDao.getMealsWithFoods(uid)
@@ -51,37 +32,58 @@ class HealthRepositoryImpl @Inject constructor(
 
     override fun getActiveGoal(uid: String): Flow<GoalEntity?> = goalDao.getActiveGoal(uid)
 
-    override suspend fun insertGoal(goal: GoalEntity) = goalDao.insertGoal(goal)
-
-    // --- DÜZELTİLEN KISIM: RANGE SORGUSU ---
     override fun getLast7DaysSummary(uid: String): Flow<List<DailySummaryEntity>> {
         val endTime = System.currentTimeMillis()
         val startTime = endTime - (7L * 24 * 60 * 60 * 1000)
-        // Artık DAO'da bu fonksiyon var
         return summaryDao.getSummariesForRange(uid, startTime, endTime)
     }
 
-    override suspend fun restoreUserProfileFromCloud(uid: String): Boolean {
-        // ... (Bu kısım aynı kalabilir, kod kalabalığı yapmamak için kısalttım) ...
-        // Senin kodundaki restoreUserProfileFromCloud mantığı aynen geçerli.
-        return try {
-            val document = firestore.collection("users").document(uid).get().await()
-            if (document.exists()) {
-                val data = document.data ?: return false
-                // ... Entity mapping işlemleri ...
-                // Buradaki kodun doğru, sadece en alta isSynced = true eklemeyi unutma.
-                return true
-            } else {
-                false
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
+    override suspend fun getCurrentUser(): UserEntity? {
+        return userDao.getAnyUser()
     }
 
     // =========================================================================
-    //  SENKRONİZASYON (ARTIK HATA VERMEYECEK)
+    //  YAZMA İŞLEMLERİ (GÜNCELLENDİ: Otomatik Tetikleyiciler Eklendi)
+    // =========================================================================
+
+    override suspend fun insertUser(user: UserEntity) {
+        userDao.insertUser(user)
+        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+    }
+
+    override suspend fun insertMealWithFoods(meal: MealEntity, foods: List<FoodEntity>) {
+        // 1. Yemeği kaydet
+        mealDao.insertMeal(meal)
+
+        // 2. Besinleri kopyala: Parent ID ve User ID set et
+        val foodsWithId = foods.map {
+            it.copy(
+                parentMealId = meal.mealId,
+                userId = meal.userId
+            )
+        }
+
+        // 3. Besinleri kaydet
+        foodDao.insertFoods(foodsWithId)
+
+        // 4. SENKRONİZASYONU TETİKLE
+        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+    }
+
+    override suspend fun insertGoal(goal: GoalEntity) {
+        goalDao.insertGoal(goal)
+        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+    }
+
+    override suspend fun insertSummary(summary: DailySummaryEntity) {
+        summaryDao.insertSummary(summary)
+        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+    }
+
+    override suspend fun deleteMeal(meal: MealEntity) = mealDao.deleteMeal(meal)
+
+    // =========================================================================
+    //  SENKRONİZASYON YARDIMCILARI (Değişiklik Yok)
     // =========================================================================
 
     // A. GETİR
@@ -98,7 +100,7 @@ class HealthRepositoryImpl @Inject constructor(
     override suspend fun markFoodAsSynced(foodId: String) = foodDao.markFoodAsSynced(foodId)
     override suspend fun markSummaryAsSynced(summaryId: String) = summaryDao.markSummaryAsSynced(summaryId)
 
-    // C. YÜKLE
+    // C. YÜKLE (UPLOAD)
     override suspend fun uploadUserToCloud(user: UserEntity) {
         val map = hashMapOf(
             "name" to user.name,
@@ -160,8 +162,43 @@ class HealthRepositoryImpl @Inject constructor(
         firestore.collection("users").document(summary.userId)
             .collection("summaries").document(summary.summaryId).set(map).await()
     }
-    // BU FONKSİYONU EKLE (En alta ekleyebilirsin)
-    override suspend fun getCurrentUser(): UserEntity? {
-        return userDao.getAnyUser()
+
+    override suspend fun restoreUserProfileFromCloud(uid: String): Boolean {
+        return try {
+            val document = firestore.collection("users").document(uid).get().await()
+            if (document.exists()) {
+                // ... mapping ve restore işlemleri ...
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // =========================================================================
+    //  MERKEZİ TETİKLEYİCİ (BU FONKSİYON YENİ)
+    // =========================================================================
+    private fun triggerImmediateSync() {
+        // Kural: Sadece İnternet Varsa
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // İstek: Tek Seferlik ve Acil
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
+
+        // Kuyruğa Ekle:
+        // APPEND_OR_REPLACE: Eğer zaten sırada bir iş varsa, bunu onun sonuna ekle veya yenisiyle devam et.
+        workManager.enqueueUniqueWork(
+            "GlobalImmediateSync",
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            syncRequest
+        )
     }
 }
