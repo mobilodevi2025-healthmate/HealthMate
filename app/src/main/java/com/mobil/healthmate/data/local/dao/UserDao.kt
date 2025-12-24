@@ -16,4 +16,16 @@ interface UserDao {
     // ID'ye göre kullanıcıyı getir
     @Query("SELECT * FROM users WHERE userId = :uid")
     fun getUser(uid: String): Flow<UserEntity?>
+
+    // 1. Senkronize olmamış (isSynced = false/0) kullanıcıları getir
+    @Query("SELECT * FROM users WHERE isSynced = 0")
+    suspend fun getUnsyncedUsers(): List<UserEntity>
+
+    // 2. Başarılı gönderim sonrası veriyi 'Senkronize Oldu' (1) olarak işaretle
+    @Query("UPDATE users SET isSynced = 1 WHERE userId = :uid")
+    suspend fun markUserAsSynced(uid: String)
+
+    // BU FONKSİYONU EKLE:
+    @Query("SELECT * FROM users LIMIT 1")
+    suspend fun getAnyUser(): UserEntity?
 }

@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.mobil.healthmate.data.local.types.GoalType
+import java.util.UUID
 
 @Entity(
     tableName = "goals",
@@ -19,8 +20,8 @@ import com.mobil.healthmate.data.local.types.GoalType
     indices = [Index(value = ["userId"])]
 )
 data class GoalEntity(
-    @PrimaryKey(autoGenerate = true)
-    val goalId: Int = 0,
+    @PrimaryKey
+    val goalId: String = UUID.randomUUID().toString(),
 
     val userId: String,
 
@@ -44,5 +45,13 @@ data class GoalEntity(
     // --- Plan Durumu ---
     val startDate: Long = System.currentTimeMillis(),
     val endDate: Long? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+
+    // --- SENKRONİZASYON İÇİN GEREKLİ ALANLAR (YENİ) ---
+
+    // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
+    val isSynced: Boolean = false,
+
+    // Çakışma Çözümü: Son güncelleme zamanı
+    val updatedAt: Long = System.currentTimeMillis()
 )

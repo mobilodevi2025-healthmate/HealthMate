@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.mobil.healthmate.data.local.types.MealType
+import java.util.UUID
 
 @Entity(
     tableName = "meals",
@@ -19,8 +20,8 @@ import com.mobil.healthmate.data.local.types.MealType
     indices = [Index(value = ["userId"])]
 )
 data class MealEntity(
-    @PrimaryKey(autoGenerate = true)
-    val mealId: Int = 0,
+    @PrimaryKey
+    val mealId: String = UUID.randomUUID().toString(),
 
     val userId: String,
 
@@ -30,5 +31,12 @@ data class MealEntity(
 
     val totalCalories: Int = 0,
 
-    val notes: String? = null
+    val notes: String? = null,
+    // --- SENKRONİZASYON İÇİN GEREKLİ ALANLAR (YENİ) ---
+
+    // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
+    val isSynced: Boolean = false,
+
+    // Çakışma Çözümü: Son güncelleme zamanı
+    val updatedAt: Long = System.currentTimeMillis()
 )
