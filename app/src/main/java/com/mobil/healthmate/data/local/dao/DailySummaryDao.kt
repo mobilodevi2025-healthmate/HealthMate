@@ -17,4 +17,15 @@ interface DailySummaryDao {
 
     @Query("SELECT * FROM daily_summaries WHERE userId = :uid ORDER BY date DESC LIMIT 7")
     fun getLast7DaysSummary(uid: String): Flow<List<DailySummaryEntity>>
+
+    // --- EKSİK OLAN RANGE SORGUSU ---
+    @Query("SELECT * FROM daily_summaries WHERE userId = :uid AND date BETWEEN :start AND :end ORDER BY date ASC")
+    fun getSummariesForRange(uid: String, start: Long, end: Long): Flow<List<DailySummaryEntity>>
+
+    // --- SENKRONİZASYON ---
+    @Query("SELECT * FROM daily_summaries WHERE isSynced = 0")
+    suspend fun getUnsyncedSummaries(): List<DailySummaryEntity>
+
+    @Query("UPDATE daily_summaries SET isSynced = 1 WHERE summaryId = :summaryId")
+    suspend fun markSummaryAsSynced(summaryId: String)
 }
