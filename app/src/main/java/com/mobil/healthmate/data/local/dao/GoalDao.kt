@@ -18,13 +18,12 @@ interface GoalDao {
     @Query("SELECT * FROM goals WHERE userId = :uid ORDER BY startDate DESC")
     fun getAllGoals(uid: String): Flow<List<GoalEntity>>
 
-    // --- SENKRONİZASYON SORGULARI (YENİ) ---
+    @Query("SELECT * FROM goals WHERE userId = :userId AND isActive = 1 LIMIT 1")
+    suspend fun getCurrentGoal(userId: String): GoalEntity?
 
-    // 1. Buluta gitmemiş hedefleri getir
     @Query("SELECT * FROM goals WHERE isSynced = 0")
     suspend fun getUnsyncedGoals(): List<GoalEntity>
 
-    // 2. Hedefi 'Senkronize' olarak işaretle
     @Query("UPDATE goals SET isSynced = 1 WHERE goalId = :goalId")
     suspend fun markGoalAsSynced(goalId: String)
 }

@@ -1,14 +1,15 @@
 package com.mobil.healthmate.data.repository
 
-import androidx.work.* // WorkManager class'ları için
+import androidx.work.*
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mobil.healthmate.data.local.dao.*
 import com.mobil.healthmate.data.local.entity.*
 import com.mobil.healthmate.data.local.relation.MealWithFoods
-import com.mobil.healthmate.data.worker.SyncWorker // Kendi Worker sınıfımız
+import com.mobil.healthmate.data.worker.SyncWorker
 import com.mobil.healthmate.domain.repository.HealthRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
+import java.util.Calendar
 import javax.inject.Inject
 
 class HealthRepositoryImpl @Inject constructor(
@@ -18,12 +19,9 @@ class HealthRepositoryImpl @Inject constructor(
     private val foodDao: FoodDao,
     private val summaryDao: DailySummaryDao,
     private val firestore: FirebaseFirestore,
-    private val workManager: WorkManager // WorkManager enjekte edildi
+    private val workManager: WorkManager
 ) : HealthRepository {
 
-    // =========================================================================
-    //  OKUMA İŞLEMLERİ (Değişiklik Yok)
-    // =========================================================================
     override fun getUser(uid: String): Flow<UserEntity?> = userDao.getUser(uid)
 
     override fun getMealsWithFoods(uid: String): Flow<List<MealWithFoods>> {
@@ -38,69 +36,98 @@ class HealthRepositoryImpl @Inject constructor(
         return summaryDao.getSummariesForRange(uid, startTime, endTime)
     }
 
+    // --- YENİ EKLENEN İMPLEMENTASYON ---
+    override fun getSummaryByDate(uid: String, date: Long): Flow<DailySummaryEntity?> {
+        return summaryDao.getSummaryByDate(uid, date)
+    }
+
     override suspend fun getCurrentUser(): UserEntity? {
         return userDao.getAnyUser()
     }
 
-    // =========================================================================
-    //  YAZMA İŞLEMLERİ (GÜNCELLENDİ: Otomatik Tetikleyiciler Eklendi)
-    // =========================================================================
+    override suspend fun getTodaySummary(userId: String): DailySummaryEntity? {
+        return summaryDao.getLatestSummary(userId)
+    }
+
+    override suspend fun getCurrentGoal(userId: String): GoalEntity? {
+        return goalDao.getCurrentGoal(userId)
+    }
 
     override suspend fun insertUser(user: UserEntity) {
         userDao.insertUser(user)
-        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+        triggerImmediateSync()
     }
 
     override suspend fun insertMealWithFoods(meal: MealEntity, foods: List<FoodEntity>) {
-        // 1. Yemeği kaydet
         mealDao.insertMeal(meal)
 
-        // 2. Besinleri kopyala: Parent ID ve User ID set et
         val foodsWithId = foods.map {
             it.copy(
                 parentMealId = meal.mealId,
                 userId = meal.userId
             )
         }
-
-        // 3. Besinleri kaydet
         foodDao.insertFoods(foodsWithId)
 
-        // 4. SENKRONİZASYONU TETİKLE
-        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = meal.date
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startOfDay = calendar.timeInMillis
+        val mealCalories = foods.sumOf { it.calories }
+
+        val existingSummary = summaryDao.getSummaryByLatestDate(meal.userId, startOfDay)
+
+        if (existingSummary != null) {
+            // Kayıt varsa üzerine ekle
+            val updatedSummary = existingSummary.copy(
+                totalCaloriesConsumed = existingSummary.totalCaloriesConsumed + mealCalories,
+                updatedAt = System.currentTimeMillis(),
+                isSynced = false
+            )
+            summaryDao.insertSummary(updatedSummary)
+        } else {
+            // Kayıt yoksa yeni oluştur
+            val newSummary = DailySummaryEntity(
+                userId = meal.userId,
+                date = startOfDay,
+                totalCaloriesConsumed = mealCalories,
+                totalSteps = 0, // Adım sensörü ayrıca güncelleyecek
+                isSynced = false
+            )
+            summaryDao.insertSummary(newSummary)
+        }
+
+        triggerImmediateSync()
     }
 
     override suspend fun insertGoal(goal: GoalEntity) {
         goalDao.insertGoal(goal)
-        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+        triggerImmediateSync()
     }
 
     override suspend fun insertSummary(summary: DailySummaryEntity) {
         summaryDao.insertSummary(summary)
-        triggerImmediateSync() // <-- Kayıt sonrası otomatik sync
+        triggerImmediateSync()
     }
 
     override suspend fun deleteMeal(meal: MealEntity) = mealDao.deleteMeal(meal)
 
-    // =========================================================================
-    //  SENKRONİZASYON YARDIMCILARI (Değişiklik Yok)
-    // =========================================================================
-
-    // A. GETİR
     override suspend fun getUnsyncedUsers() = userDao.getUnsyncedUsers()
     override suspend fun getUnsyncedGoals() = goalDao.getUnsyncedGoals()
     override suspend fun getUnsyncedMeals() = mealDao.getUnsyncedMeals()
     override suspend fun getUnsyncedFoods() = foodDao.getUnsyncedFoods()
     override suspend fun getUnsyncedSummaries() = summaryDao.getUnsyncedSummaries()
 
-    // B. İŞARETLE
     override suspend fun markUserAsSynced(uid: String) = userDao.markUserAsSynced(uid)
     override suspend fun markGoalAsSynced(goalId: String) = goalDao.markGoalAsSynced(goalId)
     override suspend fun markMealAsSynced(mealId: String) = mealDao.markMealAsSynced(mealId)
     override suspend fun markFoodAsSynced(foodId: String) = foodDao.markFoodAsSynced(foodId)
     override suspend fun markSummaryAsSynced(summaryId: String) = summaryDao.markSummaryAsSynced(summaryId)
 
-    // C. YÜKLE (UPLOAD)
     override suspend fun uploadUserToCloud(user: UserEntity) {
         val map = hashMapOf(
             "name" to user.name,
@@ -167,7 +194,6 @@ class HealthRepositoryImpl @Inject constructor(
         return try {
             val document = firestore.collection("users").document(uid).get().await()
             if (document.exists()) {
-                // ... mapping ve restore işlemleri ...
                 true
             } else {
                 false
@@ -178,23 +204,16 @@ class HealthRepositoryImpl @Inject constructor(
         }
     }
 
-    // =========================================================================
-    //  MERKEZİ TETİKLEYİCİ (BU FONKSİYON YENİ)
-    // =========================================================================
     private fun triggerImmediateSync() {
-        // Kural: Sadece İnternet Varsa
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        // İstek: Tek Seferlik ve Acil
         val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(constraints)
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .build()
 
-        // Kuyruğa Ekle:
-        // APPEND_OR_REPLACE: Eğer zaten sırada bir iş varsa, bunu onun sonuna ekle veya yenisiyle devam et.
         workManager.enqueueUniqueWork(
             "GlobalImmediateSync",
             ExistingWorkPolicy.APPEND_OR_REPLACE,
