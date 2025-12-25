@@ -172,8 +172,9 @@ fun AddMealScreen(
                 onClick = {
                     if (foodName.isNotBlank() && calorie.isNotBlank()) {
                         val newFood = FoodEntity(
-                            parentMealId = 0,
+                            parentMealId = "0",
                             name = foodName,
+                            userId = "",
 
                             quantity = quantity.toDoubleOrNull() ?: 1.0,
                             unit = selectedUnit,
@@ -204,7 +205,7 @@ fun AddMealScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (state.addedFoods.isNotEmpty()) {
-                Text("Tabaktakiler (${state.addedFoods.sumOf { it.calories }} kcal)", fontWeight = FontWeight.Bold)
+                Text("Tabaktakiler (${state.addedFoods.sumOf { it.calories }.toString()} kcal)", fontWeight = FontWeight.Bold)
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     items(state.addedFoods) { food ->
                         Card(
