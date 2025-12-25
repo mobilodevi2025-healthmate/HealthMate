@@ -5,7 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.mobil.healthmate.data.local.entity.FoodEntity
 import com.mobil.healthmate.data.local.entity.MealEntity
-import com.mobil.healthmate.data.local.types.MealType // Enum Import
+import com.mobil.healthmate.data.local.entity.DailySummaryEntity // Import Eklendi
+import com.mobil.healthmate.data.local.types.MealType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,7 @@ import javax.inject.Inject
 import com.mobil.healthmate.domain.repository.HealthRepository
 import java.util.UUID
 import kotlinx.coroutines.flow.update
+import java.util.Calendar // Import Eklendi
 
 @HiltViewModel
 class AddMealViewModel @Inject constructor(
@@ -42,36 +44,81 @@ class AddMealViewModel @Inject constructor(
 
     private fun saveMealToDatabase() {
         viewModelScope.launch {
-            // 1. Önce Veritabanındaki Kullanıcıyı Bul (UUID sorununu çözen yer)
             val currentUser = repository.getCurrentUser()
 
             if (currentUser != null) {
-                // Kullanıcı bulundu, ID'sini alıyoruz
                 val userId = currentUser.userId
                 val currentFoods = _uiState.value.addedFoods
 
                 if (currentFoods.isNotEmpty()) {
-                    // 2. Yemeği Oluştur (Doğru UserID ile)
+
+                    val totalCals = currentFoods.sumOf { it.calories }
+                    val totalProt = currentFoods.sumOf { it.protein }
+                    val totalCarb = currentFoods.sumOf { it.carbs }
+                    val totalFat = currentFoods.sumOf { it.fat }
+
                     val meal = MealEntity(
                         mealId = UUID.randomUUID().toString(),
-                        userId = userId, // <-- ARTIK DOĞRU ID GİDİYOR
+                        userId = userId,
                         mealType = _uiState.value.mealType,
                         date = System.currentTimeMillis(),
-                        totalCalories = currentFoods.sumOf { it.calories },
+
+                        totalCalories = totalCals,
+                        protein = totalProt,
+                        carbs = totalCarb,
+                        fat = totalFat,
+
                         isSynced = false
                     )
 
-                    // 3. Kaydet
+                    // 3. Yemeği Kaydet
                     repository.insertMealWithFoods(meal, currentFoods)
 
-                    // 4. UI'ı Temizle
+                    // 4. GÜNLÜK ÖZETİ GÜNCELLE (DÜZELTME 2 - Kalori Grafiği İçin)
+                    updateDailySummary(userId, totalCals)
+
+                    // 5. UI'ı Temizle
                     _uiState.update { AddMealState() }
                 }
             } else {
-                // Kullanıcı bulunamadı (Login olunmamış olabilir)
-                // Buraya log veya hata mesajı eklenebilir
                 println("HATA: Kullanıcı bulunamadı, yemek kaydedilemedi.")
             }
+        }
+    }
+
+    // YENİ EKLENEN FONKSİYON: Günlük Özet Tablosunu Günceller
+    private suspend fun updateDailySummary(userId: String, caloriesToAdd: Int) {
+        // Gün başlangıcını bul (Adım sayar ile aynı güne yazması için)
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val todayDate = calendar.timeInMillis
+
+        // O güne ait bir özet var mı diye bak
+        // NOT: Repository'e getSummaryByDate fonksiyonunu eklemiş olman lazım (ProfileViewModel'de kullanmıştık)
+        val existingSummary = repository.getSummaryByDateDirect(userId, todayDate) // Flow olmayan, suspend versiyonu
+
+        if (existingSummary != null) {
+            // Varsa üzerine ekle (Adım sayısını koru!)
+            val updatedSummary = existingSummary.copy(
+                totalCaloriesConsumed = existingSummary.totalCaloriesConsumed + caloriesToAdd,
+                updatedAt = System.currentTimeMillis(),
+                isSynced = false
+            )
+            repository.insertSummary(updatedSummary)
+        } else {
+            // Yoksa sıfırdan oluştur
+            val newSummary = DailySummaryEntity(
+                date = todayDate, // timeInMillis değil, gün başlangıcı olmalı
+                userId = userId,
+                totalCaloriesConsumed = caloriesToAdd,
+                totalSteps = 0, // Adım henüz yok
+                isSynced = false
+            )
+            repository.insertSummary(newSummary)
         }
     }
 }

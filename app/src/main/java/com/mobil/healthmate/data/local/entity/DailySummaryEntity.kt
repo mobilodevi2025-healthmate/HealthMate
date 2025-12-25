@@ -21,24 +21,18 @@ import java.util.UUID
 data class DailySummaryEntity(
     @PrimaryKey
     val summaryId: String = UUID.randomUUID().toString(),
-
     val userId: String,
-
     val date: Long,
-
     val totalCaloriesConsumed: Int = 0,
     val totalCaloriesBurned: Int = 0,
-
     val totalWaterIntake: Int = 0,
     val totalSteps: Int = 0,
     val sleepDuration: Double = 0.0,
-
+    val totalProtein: Float = 0f,
+    val totalCarbs: Float = 0f,
+    val totalFat: Float = 0f,
     val currentWeight: Double? = null,
     val mood: String? = null,
-
-    // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
     val isSynced: Boolean = false,
-
-    // Çakışma Çözümü: Son güncelleme zamanı
     val updatedAt: Long = System.currentTimeMillis()
 )

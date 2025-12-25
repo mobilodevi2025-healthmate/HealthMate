@@ -43,7 +43,6 @@ fun ProfileScreen(
     val isEditing by viewModel.isEditing.collectAsState()
     val profileImagePath by viewModel.profileImagePath.collectAsState()
 
-    // Fotoğraf Seçici
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -52,6 +51,7 @@ fun ProfileScreen(
         }
     }
 
+    // Form States
     var name by remember { mutableStateOf("") }
     var height by remember { mutableStateOf("") }
     var weight by remember { mutableStateOf("") }
@@ -59,8 +59,7 @@ fun ProfileScreen(
     var selectedGender by remember { mutableStateOf(Gender.MALE) }
     var isGenderExpanded by remember { mutableStateOf(false) }
 
-    // Edit modu açıldığında mevcut verileri doldur
-    LaunchedEffect(isEditing, uiState) {
+    LaunchedEffect(isEditing) {
         if (isEditing) {
             name = uiState.name
             height = uiState.height
@@ -101,7 +100,6 @@ fun ProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // --- PROFİL RESMİ ---
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -151,38 +149,44 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             if (isEditing) {
-                // --- DÜZENLEME FORMU ---
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
                     OutlinedTextField(
-                        value = name, onValueChange = { name = it },
+                        value = name,
+                        onValueChange = { name = it },
                         label = { Text("Ad Soyad") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         OutlinedTextField(
-                            value = height, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) height = it },
+                            value = height,
+                            onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) height = it },
                             label = { Text("Boy (cm)") },
                             modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
                         )
                         OutlinedTextField(
-                            value = weight, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) weight = it },
+                            value = weight,
+                            onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) weight = it },
                             label = { Text("Kilo (kg)") },
                             modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
                         )
                     }
 
                     OutlinedTextField(
-                        value = age, onValueChange = { if (it.all { c -> c.isDigit() }) age = it },
+                        value = age,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) age = it },
                         label = { Text("Yaş") },
                         modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
                     )
 
-                    // Cinsiyet Seçimi Dropdown
                     ExposedDropdownMenuBox(
                         expanded = isGenderExpanded,
                         onExpandedChange = { isGenderExpanded = !isGenderExpanded },
@@ -231,13 +235,13 @@ fun ProfileScreen(
                                     weight = weight,
                                     gender = selectedGender,
                                     activityLevel = uiState.activityLevel,
-
                                     targetWeight = uiState.targetWeight,
                                     targetCalories = uiState.targetCalories,
                                     dailyStepGoal = uiState.dailyStepGoal,
                                     sleepTargetHours = uiState.sleepTargetHours,
                                     bedTime = uiState.bedTime
                                 ))
+                                Toast.makeText(context, "Profil güncellendi", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f)
                         ) {
@@ -271,11 +275,14 @@ fun ProfileInfoItem(label: String, value: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = MaterialTheme.shapes.small)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                shape = MaterialTheme.shapes.small
+            )
             .padding(12.dp)
     ) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(text = value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+        Text(text = value.ifBlank { "-" }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
     }
 }

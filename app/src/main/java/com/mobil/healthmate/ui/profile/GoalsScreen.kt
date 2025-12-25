@@ -1,6 +1,5 @@
 package com.mobil.healthmate.ui.profile
 
-import android.app.TimePickerDialog
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -8,8 +7,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -20,8 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MonitorWeight
@@ -42,9 +37,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mobil.healthmate.data.local.entity.DailySummaryEntity
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+enum class MacroType(val title: String, val color: Color) {
+    PROTEIN("Protein", Color(0xFF4CAF50)),
+    CARBS("Karb", Color(0xFF2196F3)),
+    FAT("Yağ", Color(0xFFFFC107))
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -55,19 +55,20 @@ fun GoalsScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val currentSteps by viewModel.currentSteps.collectAsState()
-    val weeklySummaries by viewModel.weeklySummaries.collectAsState()
-    val currentCalories by viewModel.currentCalories.collectAsState()
 
     var selectedCategory by remember { mutableStateOf(GoalCategory.STEPS) }
+    var selectedMacro by remember { mutableStateOf(MacroType.PROTEIN) }
 
-    // Input States
     var stepInput by remember { mutableStateOf("") }
     var calorieInput by remember { mutableStateOf("") }
     var weightInput by remember { mutableStateOf("") }
-    var sleepInput by remember { mutableStateOf("") }
-    var bedTimeInput by remember { mutableStateOf("") }
 
-    val pageCount = if (selectedCategory == GoalCategory.WEIGHT) 1 else 2
+    val pageCount = when (selectedCategory) {
+        GoalCategory.WEIGHT -> 1
+        GoalCategory.CALORIES -> 3
+        else -> 2
+    }
+
     val pagerState = rememberPagerState(pageCount = { pageCount })
 
     LaunchedEffect(selectedCategory) {
@@ -79,15 +80,13 @@ fun GoalsScreen(
             if (stepInput.isBlank()) stepInput = uiState.dailyStepGoal
             if (calorieInput.isBlank()) calorieInput = uiState.targetCalories
             if (weightInput.isBlank()) weightInput = uiState.targetWeight
-            if (sleepInput.isBlank()) sleepInput = uiState.sleepTargetHours
-            if (bedTimeInput.isBlank()) bedTimeInput = uiState.bedTime
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Hedeflerim") },
+                title = { Text("Hedeflerim ve Analiz") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
@@ -103,7 +102,6 @@ fun GoalsScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Text(
                 "Hedef Türünü Seçin",
                 style = MaterialTheme.typography.labelLarge,
@@ -130,16 +128,17 @@ fun GoalsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(320.dp)
+                    .height(360.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
                     .padding(16.dp)
             ) {
                 Column {
-                    // Başlık Mantığı
                     val titleText = when {
                         selectedCategory == GoalCategory.WEIGHT -> "Mevcut Kilo Durumu"
                         pagerState.currentPage == 0 -> "Bugünün Durumu"
-                        else -> "Son 7 Günlük Performans"
+                        pagerState.currentPage == 1 -> "Haftalık Performans"
+                        pagerState.currentPage == 2 -> "Haftalık Makro Analizi"
+                        else -> "İstatistikler"
                     }
 
                     Text(
@@ -156,26 +155,39 @@ fun GoalsScreen(
                         state = pagerState,
                         modifier = Modifier.weight(1f)
                     ) { page ->
-                        if (page == 0) {
-                            DailyCircularChart(
+                        when (page) {
+                            0 -> DailyCircularChart(
                                 selectedCategory = selectedCategory,
                                 currentSteps = currentSteps,
-                                currentCalories = currentCalories,
+                                currentCalories = uiState.currentCalories,
                                 uiState = uiState,
-                                inputValues = Triple(stepInput, calorieInput, weightInput),
-                                sleepInput = sleepInput
+                                inputValues = Triple(stepInput, calorieInput, weightInput)
                             )
-                        } else {
-                            WeeklyBarChart(
-                                weeklyData = weeklySummaries,
+                            1 -> WeeklyBarChart(
+                                weeklyData = uiState.weeklySummaries,
                                 category = selectedCategory,
-                                targetStr = when(selectedCategory) {
-                                    GoalCategory.STEPS -> stepInput
-                                    GoalCategory.CALORIES -> calorieInput
-                                    GoalCategory.SLEEP -> sleepInput
-                                    GoalCategory.WEIGHT -> weightInput
-                                }
+                                targetStr = if (selectedCategory == GoalCategory.STEPS) stepInput else calorieInput
                             )
+                            2 -> if (selectedCategory == GoalCategory.CALORIES) {
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        MacroType.values().forEach { macro ->
+                                            MacroTabButton(
+                                                macro = macro,
+                                                isSelected = selectedMacro == macro,
+                                                onClick = { selectedMacro = macro }
+                                            )
+                                        }
+                                    }
+                                    WeeklyMacroChart(
+                                        weeklyData = uiState.weeklyMacros,
+                                        selectedMacro = selectedMacro
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -209,9 +221,7 @@ fun GoalsScreen(
                 category = selectedCategory,
                 stepInput = stepInput, onStepChange = { stepInput = it },
                 calorieInput = calorieInput, onCalorieChange = { calorieInput = it },
-                weightInput = weightInput, onWeightChange = { weightInput = it },
-                sleepInput = sleepInput, onSleepChange = { sleepInput = it },
-                bedTimeInput = bedTimeInput, onBedTimeChange = { bedTimeInput = it }
+                weightInput = weightInput, onWeightChange = { weightInput = it }
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -219,19 +229,11 @@ fun GoalsScreen(
             Button(
                 onClick = {
                     viewModel.onEvent(ProfileEvent.SaveProfile(
-                        name = uiState.name,
-                        age = uiState.age,
-                        height = uiState.height,
-                        weight = uiState.weight,
-                        gender = uiState.gender,
-                        activityLevel = uiState.activityLevel,
-                        targetWeight = weightInput,
-                        targetCalories = calorieInput,
-                        dailyStepGoal = stepInput,
-                        sleepTargetHours = sleepInput,
-                        bedTime = bedTimeInput
+                        name = uiState.name, age = uiState.age, height = uiState.height, weight = uiState.weight,
+                        gender = uiState.gender, activityLevel = uiState.activityLevel, targetWeight = weightInput,
+                        targetCalories = calorieInput, dailyStepGoal = stepInput, sleepTargetHours = uiState.sleepTargetHours,
+                        bedTime = uiState.bedTime
                     ))
-
                     Toast.makeText(context, "${selectedCategory.title} hedefi güncellendi!", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp)
@@ -243,101 +245,62 @@ fun GoalsScreen(
 }
 
 @Composable
-fun DailyCircularChart(
-    selectedCategory: GoalCategory,
-    currentSteps: Int,
-    currentCalories: Int,
-    uiState: com.mobil.healthmate.ui.profile.ProfileUiState,
-    inputValues: Triple<String, String, String>,
-    sleepInput: String
+fun WeeklyMacroChart(
+    weeklyData: List<DailyMacroStats>,
+    selectedMacro: MacroType
 ) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-
-        // Veri Hazırlığı
-        val (currentValue, targetValueStr, displayUnit) = when (selectedCategory) {
-            GoalCategory.STEPS -> Triple(currentSteps.toFloat(), inputValues.first, "Adım")
-            GoalCategory.CALORIES -> Triple(currentCalories.toFloat(), inputValues.second, "Kcal")
-            GoalCategory.WEIGHT -> Triple(uiState.weight.toFloatOrNull() ?: 0f, inputValues.third, "Kg")
-            GoalCategory.SLEEP -> Triple(0f, sleepInput, "Saat")
+    if (weeklyData.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Veri yok", color = Color.Gray)
         }
+        return
+    }
 
-        val targetValue = targetValueStr.toFloatOrNull() ?: 1f
-
-        var progress = 0f
-        var progressColor = MaterialTheme.colorScheme.primary
-
-        if (targetValue > 0) {
-            if (selectedCategory == GoalCategory.WEIGHT) {
-                if (currentValue > targetValue) {
-                    progress = (targetValue / currentValue).coerceIn(0f, 1f)
-
-                    progressColor = Color(0xFFEF6C00) // Orange800
-                } else {
-                    progress = (currentValue / targetValue).coerceIn(0f, 1f)
-                    progressColor = MaterialTheme.colorScheme.primary
-                }
-            } else {
-                progress = (currentValue / targetValue).coerceIn(0f, 1f)
-                progressColor = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier.fillMaxSize().padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        weeklyData.forEach { stat ->
+            val value = when(selectedMacro) {
+                MacroType.PROTEIN -> stat.totalProtein
+                MacroType.CARBS -> stat.totalCarbs
+                MacroType.FAT -> stat.totalFat
             }
-        }
 
-        val animatedProgress by animateFloatAsState(
-            targetValue = progress,
-            animationSpec = tween(1000),
-            label = "ProgressAnimation"
-        )
-
-        CircularProgressIndicator(
-            progress = { 1f },
-            modifier = Modifier.size(200.dp),
-            color = Color.LightGray.copy(alpha = 0.3f),
-            strokeWidth = 12.dp,
-        )
-
-        CircularProgressIndicator(
-            progress = { animatedProgress },
-            modifier = Modifier.size(200.dp),
-            color = progressColor,
-            strokeWidth = 12.dp,
-            strokeCap = StrokeCap.Round
-        )
-
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = if (selectedCategory == GoalCategory.WEIGHT) "Mevcut" else "Bugün",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
-            )
-            Text(
-                text = if (selectedCategory == GoalCategory.STEPS) currentValue.toInt().toString() else currentValue.toString(),
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = progressColor // Metin rengini de duruma göre değiştirebiliriz
-            )
-            Text(
-                text = "/ $targetValueStr $displayUnit Hedef",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
-            )
-
-            // Kilo için ek bilgi metni
-            if (selectedCategory == GoalCategory.WEIGHT && targetValue > 0) {
-                val diff = currentValue - targetValue
-                val infoText = if (diff > 0) {
-                    "${String.format("%.1f", diff)} kg fazlan var"
-                } else if (diff < 0) {
-                    "${String.format("%.1f", -diff)} kg alman lazım"
-                } else {
-                    "Hedefe ulaştın!"
+            val maxInChart = weeklyData.maxOf {
+                when(selectedMacro) {
+                    MacroType.PROTEIN -> it.totalProtein
+                    MacroType.CARBS -> it.totalCarbs
+                    MacroType.FAT -> it.totalFat
                 }
+            }.coerceAtLeast(50f) * 1.2f
 
+            val barHeightRatio = (value / maxInChart).coerceIn(0.02f, 1f)
+            val dayName = SimpleDateFormat("EEE", Locale("tr")).format(Date(stat.date))
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
+                modifier = Modifier.fillMaxHeight()
+            ) {
                 Text(
-                    text = infoText,
+                    text = "${value.toInt()}g",
                     style = MaterialTheme.typography.labelSmall,
-                    color = progressColor,
-                    modifier = Modifier.padding(top = 4.dp)
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = selectedMacro.color
                 )
+                Spacer(modifier = Modifier.height(2.dp))
+                Box(
+                    modifier = Modifier
+                        .width(18.dp)
+                        .fillMaxHeight(barHeightRatio)
+                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                        .background(selectedMacro.color)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = dayName, style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = Color.Gray)
             }
         }
     }
@@ -349,11 +312,11 @@ fun WeeklyBarChart(
     category: GoalCategory,
     targetStr: String
 ) {
-    val targetValue = targetStr.toFloatOrNull() ?: 100f
+    val targetValue = targetStr.toFloatOrNull() ?: 2000f
 
     if (weeklyData.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Henüz geçmiş veri yok", color = Color.Gray)
+            Text("Geçmiş veri yok", color = Color.Gray)
         }
         return
     }
@@ -363,33 +326,32 @@ fun WeeklyBarChart(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.Bottom
     ) {
-        weeklyData.takeLast(7).forEach { summary ->
-            val value = when(category) {
-                GoalCategory.STEPS -> summary.totalSteps.toFloat()
-                GoalCategory.CALORIES -> summary.totalCaloriesConsumed.toFloat()
-                else -> summary.totalSteps.toFloat()
-            }
+        weeklyData.forEach { summary ->
+            val value = if (category == GoalCategory.STEPS) summary.totalSteps.toFloat() else summary.totalCaloriesConsumed.toFloat()
 
             val maxInChart = maxOf(targetValue, weeklyData.maxOf {
-                when(category) {
-                    GoalCategory.STEPS -> it.totalSteps.toFloat()
-                    GoalCategory.CALORIES -> it.totalCaloriesConsumed.toFloat()
-                    else -> 1f
-                }
-            }) * 1.2f
+                if (category == GoalCategory.STEPS) it.totalSteps.toFloat() else it.totalCaloriesConsumed.toFloat()
+            }.coerceAtLeast(1f)) * 1.2f
 
             val barHeightRatio = (value / maxInChart).coerceIn(0.05f, 1f)
-            val date = Date(summary.date)
-            val dayName = SimpleDateFormat("EEE", Locale("tr")).format(date)
+            val dayName = SimpleDateFormat("EEE", Locale("tr")).format(Date(summary.date))
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom,
                 modifier = Modifier.fillMaxHeight()
             ) {
+                Text(
+                    text = value.toInt().toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
                 Box(
                     modifier = Modifier
-                        .width(16.dp)
+                        .width(18.dp)
                         .fillMaxHeight(barHeightRatio)
                         .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                         .background(if (value >= targetValue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
@@ -402,133 +364,67 @@ fun WeeklyBarChart(
 }
 
 @Composable
-fun CategoryInputFields(
-    category: GoalCategory,
-    stepInput: String, onStepChange: (String) -> Unit,
-    calorieInput: String, onCalorieChange: (String) -> Unit,
-    weightInput: String, onWeightChange: (String) -> Unit,
-    sleepInput: String, onSleepChange: (String) -> Unit,
-    bedTimeInput: String, onBedTimeChange: (String) -> Unit
+fun MacroTabButton(macro: MacroType, isSelected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) macro.color.copy(alpha = 0.2f) else Color.Transparent)
+            .border(1.dp, if (isSelected) macro.color else Color.LightGray, RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(text = macro.title, style = MaterialTheme.typography.labelSmall, color = if (isSelected) macro.color else Color.Gray)
+    }
+}
+
+@Composable
+fun DailyCircularChart(
+    selectedCategory: GoalCategory, currentSteps: Int, currentCalories: Int,
+    uiState: ProfileUiState, inputValues: Triple<String, String, String>
 ) {
-    val context = LocalContext.current
-
-    when (category) {
-        GoalCategory.STEPS -> {
-            OutlinedTextField(
-                value = stepInput,
-                onValueChange = { if (it.all { c -> c.isDigit() }) onStepChange(it) },
-                label = { Text("Günlük Adım") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                trailingIcon = { Icon(Icons.Default.DirectionsWalk, null) }
-            )
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        val (currentValue, targetValueStr, displayUnit) = when (selectedCategory) {
+            GoalCategory.STEPS -> Triple(currentSteps.toFloat(), inputValues.first, "Adım")
+            GoalCategory.CALORIES -> Triple(currentCalories.toFloat(), inputValues.second, "Kcal")
+            GoalCategory.WEIGHT -> Triple(uiState.weight.toFloatOrNull() ?: 0f, inputValues.third, "Kg")
         }
-        GoalCategory.CALORIES -> {
-            OutlinedTextField(
-                value = calorieInput,
-                onValueChange = { if (it.all { c -> c.isDigit() }) onCalorieChange(it) },
-                label = { Text("Günlük Kalori") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                trailingIcon = { Icon(Icons.Default.LocalFireDepartment, null) }
-            )
-        }
-        GoalCategory.WEIGHT -> {
-            OutlinedTextField(
-                value = weightInput,
-                onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) onWeightChange(it) },
-                label = { Text("Hedef Kilo") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                trailingIcon = { Icon(Icons.Default.MonitorWeight, null) }
-            )
-        }
-        GoalCategory.SLEEP -> {
-            OutlinedTextField(
-                value = sleepInput,
-                onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) onSleepChange(it) },
-                label = { Text("Günlük Uyku Hedefi (Saat)") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                trailingIcon = { Icon(Icons.Default.Bedtime, null) }
-            )
 
-            Spacer(modifier = Modifier.height(16.dp))
+        val targetValue = targetValueStr.toFloatOrNull() ?: 1f
+        val progress = (currentValue / targetValue).coerceIn(0f, 1f)
+        val progressColor = if (selectedCategory == GoalCategory.WEIGHT && currentValue > targetValue) Color(0xFFEF6C00) else MaterialTheme.colorScheme.primary
 
-            val calendar = Calendar.getInstance()
-            val currentHour = bedTimeInput.split(":").getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.HOUR_OF_DAY)
-            val currentMinute = bedTimeInput.split(":").getOrNull(1)?.toIntOrNull() ?: calendar.get(Calendar.MINUTE)
+        val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1000), label = "Progress")
 
-            val timePickerDialog = TimePickerDialog(
-                context,
-                { _, hour: Int, minute: Int ->
-                    onBedTimeChange(String.format("%02d:%02d", hour, minute))
-                },
-                currentHour,
-                currentMinute,
-                true
-            )
+        CircularProgressIndicator(progress = { 1f }, modifier = Modifier.size(200.dp), color = Color.LightGray.copy(alpha = 0.3f), strokeWidth = 12.dp)
+        CircularProgressIndicator(progress = { animatedProgress }, modifier = Modifier.size(200.dp), color = progressColor, strokeWidth = 12.dp, strokeCap = StrokeCap.Round)
 
-            OutlinedTextField(
-                value = bedTimeInput,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Yatış Saati") },
-                placeholder = { Text("Seçmek için dokun") },
-                modifier = Modifier.fillMaxWidth(),
-                trailingIcon = { Icon(Icons.Default.AccessTime, contentDescription = "Saat Seç") },
-                interactionSource = remember { MutableInteractionSource() }
-                    .also { interactionSource ->
-                        LaunchedEffect(interactionSource) {
-                            interactionSource.interactions.collect {
-                                if (it is PressInteraction.Release) {
-                                    timePickerDialog.show()
-                                }
-                            }
-                        }
-                    }
-            )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = if (selectedCategory == GoalCategory.WEIGHT) "Mevcut" else "Bugün", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Text(text = if (selectedCategory == GoalCategory.STEPS) currentValue.toInt().toString() else String.format("%.1f", currentValue), style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold, color = progressColor)
+            Text(text = "/ $targetValueStr $displayUnit Hedef", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
         }
     }
 }
 
 @Composable
-fun GoalSelectionCard(
-    category: GoalCategory,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
+fun CategoryInputFields(category: GoalCategory, stepInput: String, onStepChange: (String) -> Unit, calorieInput: String, onCalorieChange: (String) -> Unit, weightInput: String, onWeightChange: (String) -> Unit) {
+    val keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+    when (category) {
+        GoalCategory.STEPS -> OutlinedTextField(value = stepInput, onValueChange = { if (it.all { c -> c.isDigit() }) onStepChange(it) }, label = { Text("Günlük Adım") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = keyboardOptions, trailingIcon = { Icon(Icons.Default.DirectionsWalk, null) })
+        GoalCategory.CALORIES -> OutlinedTextField(value = calorieInput, onValueChange = { if (it.all { c -> c.isDigit() }) onCalorieChange(it) }, label = { Text("Günlük Kalori") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = keyboardOptions, trailingIcon = { Icon(Icons.Default.LocalFireDepartment, null) })
+        GoalCategory.WEIGHT -> OutlinedTextField(value = weightInput, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) onWeightChange(it) }, label = { Text("Hedef Kilo") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = keyboardOptions, trailingIcon = { Icon(Icons.Default.MonitorWeight, null) })
+    }
+}
+
+@Composable
+fun GoalSelectionCard(category: GoalCategory, isSelected: Boolean, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .width(110.dp)
-            .height(80.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .border(
-                width = if (isSelected) 2.dp else 0.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(12.dp)
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-        )
+        modifier = Modifier.width(110.dp).height(80.dp).clip(RoundedCornerShape(12.dp)).clickable { onClick() }.border(if (isSelected) 2.dp else 0.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = category.icon,
-                contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = category.title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-            )
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(category.icon, null, tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray)
+            Text(category.title, style = MaterialTheme.typography.labelMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
         }
     }
 }
@@ -536,6 +432,5 @@ fun GoalSelectionCard(
 enum class GoalCategory(val title: String, val unit: String, val icon: ImageVector) {
     STEPS("Adım", "adım", Icons.Default.DirectionsWalk),
     CALORIES("Kalori", "kcal", Icons.Default.LocalFireDepartment),
-    WEIGHT("Kilo", "kg", Icons.Default.MonitorWeight),
-    SLEEP("Uyku", "saat", Icons.Default.Bedtime)
+    WEIGHT("Kilo", "kg", Icons.Default.MonitorWeight)
 }

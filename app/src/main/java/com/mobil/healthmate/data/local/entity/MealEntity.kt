@@ -22,21 +22,14 @@ import java.util.UUID
 data class MealEntity(
     @PrimaryKey
     val mealId: String = UUID.randomUUID().toString(),
-
     val userId: String,
-
-    val mealType: MealType, // Değiştirildi: Enum kullanımı
-
+    val mealType: MealType,
     val date: Long,
-
     val totalCalories: Int = 0,
-
+    val protein: Double = 0.0,
+    val carbs: Double = 0.0,
+    val fat: Double = 0.0,
     val notes: String? = null,
-    // --- SENKRONİZASYON İÇİN GEREKLİ ALANLAR (YENİ) ---
-
-    // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
     val isSynced: Boolean = false,
-
-    // Çakışma Çözümü: Son güncelleme zamanı
     val updatedAt: Long = System.currentTimeMillis()
 )
