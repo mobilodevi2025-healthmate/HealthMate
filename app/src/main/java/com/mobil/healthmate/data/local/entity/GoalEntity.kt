@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.mobil.healthmate.data.local.types.GoalType
+import java.util.UUID
 
 @Entity(
     tableName = "goals",
@@ -19,13 +20,12 @@ import com.mobil.healthmate.data.local.types.GoalType
     indices = [Index(value = ["userId"])]
 )
 data class GoalEntity(
-    @PrimaryKey(autoGenerate = true)
-    val goalId: Int = 0,
+    @PrimaryKey
+    val goalId: String = UUID.randomUUID().toString(),
 
     val userId: String,
 
-    // --- Genel Hedef Türü ---
-    val mainGoalType: GoalType, // Değiştirildi: Enum kullanımı
+    val mainGoalType: GoalType,
 
     // --- Fiziksel Hedefler (Opsiyonel) ---
     val targetWeight: Double? = null,
@@ -35,7 +35,12 @@ data class GoalEntity(
     val dailyCalorieTarget: Int? = null,
     val dailyStepTarget: Int? = null,
     val dailyWaterTarget: Int? = null,
+
+    // Zaten vardı, bu hedef uyku süresidir (Örn: 8.0 saat)
     val dailySleepTarget: Double? = null,
+
+    // --- YENİ EKLENEN: Yatış Saati (Alarm İçin) ---
+    val bedTime: String? = "23:00",
 
     // --- Aralıklı Oruç (Fasting) Saatleri ---
     val fastingWindowStart: String? = null,
@@ -44,5 +49,8 @@ data class GoalEntity(
     // --- Plan Durumu ---
     val startDate: Long = System.currentTimeMillis(),
     val endDate: Long? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+
+    val isSynced: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.mobil.healthmate.data.local.types.MealType
+import java.util.UUID
 
 @Entity(
     tableName = "meals",
@@ -19,16 +20,16 @@ import com.mobil.healthmate.data.local.types.MealType
     indices = [Index(value = ["userId"])]
 )
 data class MealEntity(
-    @PrimaryKey(autoGenerate = true)
-    val mealId: Int = 0,
-
+    @PrimaryKey
+    val mealId: String = UUID.randomUUID().toString(),
     val userId: String,
-
-    val mealType: MealType, // Değiştirildi: Enum kullanımı
-
+    val mealType: MealType,
     val date: Long,
-
     val totalCalories: Int = 0,
-
-    val notes: String? = null
+    val protein: Double = 0.0,
+    val carbs: Double = 0.0,
+    val fat: Double = 0.0,
+    val notes: String? = null,
+    val isSynced: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -4,12 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.mobil.healthmate.data.local.relation.MealWithFoods
-import com.mobil.healthmate.domain.repository.HealthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.mobil.healthmate.domain.repository.HealthRepository
+
 
 @HiltViewModel
 class MealListViewModel @Inject constructor(
