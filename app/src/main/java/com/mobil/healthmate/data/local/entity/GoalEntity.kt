@@ -25,8 +25,7 @@ data class GoalEntity(
 
     val userId: String,
 
-    // --- Genel Hedef Türü ---
-    val mainGoalType: GoalType, // Değiştirildi: Enum kullanımı
+    val mainGoalType: GoalType,
 
     // --- Fiziksel Hedefler (Opsiyonel) ---
     val targetWeight: Double? = null,

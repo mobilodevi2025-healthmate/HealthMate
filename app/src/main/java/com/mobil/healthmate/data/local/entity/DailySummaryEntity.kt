@@ -35,7 +35,6 @@ data class DailySummaryEntity(
 
     val currentWeight: Double? = null,
     val mood: String? = null,
-    // --- SENKRONİZASYON İÇİN GEREKLİ ALANLAR (YENİ) ---
 
     // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
     val isSynced: Boolean = false,
