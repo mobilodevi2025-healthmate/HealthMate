@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "679647994570",
+    "project_id": "healthmate-b76f1",
+    "storage_bucket": "healthmate-b76f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:679647994570:android:91560dcb5e9892ae768a33",
+        "android_client_info": {
+          "package_name": "com.mobil.healthmate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "679647994570-ue64j040lbjttvh7s2bs8k5tmq7t11ik.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mobil.healthmate",
+            "certificate_hash": "8411e0f208479c31f492db59840ea291bcdd9efb"
+          }
+        },
+        {
+          "client_id": "679647994570-uddc77q43cpkil708a2bud6pki6ilju5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUoOuSasV13HJxWsaqtsCaVg-Xjl7u7KU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "679647994570-uddc77q43cpkil708a2bud6pki6ilju5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
