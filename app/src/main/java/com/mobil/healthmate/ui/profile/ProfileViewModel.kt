@@ -13,13 +13,13 @@ import com.mobil.healthmate.data.local.manager.SettingsManager
 import com.mobil.healthmate.data.local.types.ActivityLevel
 import com.mobil.healthmate.data.local.types.Gender
 import com.mobil.healthmate.data.local.types.GoalType
-import com.mobil.healthmate.domain.repository.HealthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.mobil.healthmate.domain.repository.HealthRepository
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
