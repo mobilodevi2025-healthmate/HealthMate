@@ -78,12 +78,11 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation("com.google.android.gms:play-services-auth:21.2.0")
-    // 1. DataStore (Ayarlar için - SharedPreferences yerine)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.compose.material:material-icons-extended")
-    // 2. Coil (Resim yükleme ve gösterme için)
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.hilt:hilt-work:1.2.0")
-    kapt("androidx.hilt:hilt-compiler:1.2.0") // Hilt ile Worker kullanmak için
+    kapt("androidx.hilt:hilt-compiler:1.2.0")
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
 }
