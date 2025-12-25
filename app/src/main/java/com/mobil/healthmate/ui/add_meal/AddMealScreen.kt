@@ -171,19 +171,32 @@ fun AddMealScreen(
             Button(
                 onClick = {
                     if (foodName.isNotBlank() && calorie.isNotBlank()) {
+                        // 1. Önce kullanıcının girdiği ham değerleri al
+                        val inputQty = quantity.toDoubleOrNull() ?: 1.0
+                        val unitCalorie = calorie.toIntOrNull() ?: 0
+                        val unitProtein = protein.toDoubleOrNull() ?: 0.0
+                        val unitCarbs = carbs.toDoubleOrNull() ?: 0.0
+                        val unitFat = fat.toDoubleOrNull() ?: 0.0
+
+                        val totalCalorie = (unitCalorie * inputQty).toInt()
+                        val totalProtein = unitProtein * inputQty
+                        val totalCarbs = unitCarbs * inputQty
+                        val totalFat = unitFat * inputQty
+
                         val newFood = FoodEntity(
                             parentMealId = "0",
                             name = foodName,
                             userId = "",
 
-                            quantity = quantity.toDoubleOrNull() ?: 1.0,
+                            quantity = inputQty,
                             unit = selectedUnit,
 
-                            calories = calorie.toIntOrNull() ?: 0,
-                            protein = protein.toDoubleOrNull() ?: 0.0,
-                            carbs = carbs.toDoubleOrNull() ?: 0.0,
-                            fat = fat.toDoubleOrNull() ?: 0.0
+                            calories = totalCalorie,
+                            protein = totalProtein,
+                            carbs = totalCarbs,
+                            fat = totalFat
                         )
+
                         viewModel.onEvent(AddMealEvent.OnAddFood(newFood))
 
                         foodName = ""

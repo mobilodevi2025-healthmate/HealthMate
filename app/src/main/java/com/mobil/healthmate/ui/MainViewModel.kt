@@ -16,7 +16,6 @@ class MainViewModel @Inject constructor(
     private val workManager: WorkManager
 ) : ViewModel() {
 
-    // UI'ın dinleyeceği internet durumu
     val networkStatus = connectivityObserver.observe()
         .stateIn(
             scope = viewModelScope,
@@ -25,14 +24,12 @@ class MainViewModel @Inject constructor(
         )
 
     init {
-        // ViewModel başladığında interneti dinlemeye başla
         observeNetwork()
     }
 
     private fun observeNetwork() {
         networkStatus.onEach { status ->
             if (status == ConnectivityObserverStatus.Available) {
-                // İNTERNET GELDİ! -> HEMEN SENKRONİZASYON BAŞLAT
                 triggerImmediateSync()
             }
         }.launchIn(viewModelScope)
@@ -45,7 +42,7 @@ class MainViewModel @Inject constructor(
 
         workManager.enqueueUniqueWork(
             "ImmediateSync",
-            ExistingWorkPolicy.KEEP, // Zaten çalışıyorsa elleme
+            ExistingWorkPolicy.KEEP,
             syncRequest
         )
     }

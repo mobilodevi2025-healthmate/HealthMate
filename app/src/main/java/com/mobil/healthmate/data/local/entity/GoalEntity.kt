@@ -25,8 +25,7 @@ data class GoalEntity(
 
     val userId: String,
 
-    // --- Genel Hedef Türü ---
-    val mainGoalType: GoalType, // Değiştirildi: Enum kullanımı
+    val mainGoalType: GoalType,
 
     // --- Fiziksel Hedefler (Opsiyonel) ---
     val targetWeight: Double? = null,
@@ -36,7 +35,12 @@ data class GoalEntity(
     val dailyCalorieTarget: Int? = null,
     val dailyStepTarget: Int? = null,
     val dailyWaterTarget: Int? = null,
+
+    // Zaten vardı, bu hedef uyku süresidir (Örn: 8.0 saat)
     val dailySleepTarget: Double? = null,
+
+    // --- YENİ EKLENEN: Yatış Saati (Alarm İçin) ---
+    val bedTime: String? = "23:00",
 
     // --- Aralıklı Oruç (Fasting) Saatleri ---
     val fastingWindowStart: String? = null,
@@ -47,11 +51,6 @@ data class GoalEntity(
     val endDate: Long? = null,
     val isActive: Boolean = true,
 
-    // --- SENKRONİZASYON İÇİN GEREKLİ ALANLAR (YENİ) ---
-
-    // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
     val isSynced: Boolean = false,
-
-    // Çakışma Çözümü: Son güncelleme zamanı
     val updatedAt: Long = System.currentTimeMillis()
 )
