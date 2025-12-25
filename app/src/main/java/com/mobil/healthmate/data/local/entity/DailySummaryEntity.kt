@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "daily_summaries",
@@ -18,8 +19,8 @@ import androidx.room.PrimaryKey
     indices = [Index(value = ["userId", "date"], unique = true)]
 )
 data class DailySummaryEntity(
-    @PrimaryKey(autoGenerate = true)
-    val summaryId: Int = 0,
+    @PrimaryKey
+    val summaryId: String = UUID.randomUUID().toString(),
 
     val userId: String,
 
@@ -33,5 +34,12 @@ data class DailySummaryEntity(
     val sleepDuration: Double = 0.0,
 
     val currentWeight: Double? = null,
-    val mood: String? = null
+    val mood: String? = null,
+    // --- SENKRONİZASYON İÇİN GEREKLİ ALANLAR (YENİ) ---
+
+    // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
+    val isSynced: Boolean = false,
+
+    // Çakışma Çözümü: Son güncelleme zamanı
+    val updatedAt: Long = System.currentTimeMillis()
 )
