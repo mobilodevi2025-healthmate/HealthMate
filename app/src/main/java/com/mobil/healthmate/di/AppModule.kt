@@ -9,11 +9,17 @@ import com.mobil.healthmate.data.local.dao.UserDao
 import com.mobil.healthmate.data.local.dao.GoalDao
 import com.mobil.healthmate.data.local.dao.MealDao
 import com.mobil.healthmate.data.local.dao.DailySummaryDao
+import com.mobil.healthmate.data.local.dao.FoodDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import com.mobil.healthmate.data.manager.NetworkConnectivityObserverImpl
+import com.mobil.healthmate.domain.manager.NetworkConnectivityObserver
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
+import androidx.work.WorkManager // <-- Bu import önemli
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -57,6 +63,12 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideFoodDao(db: AppDatabase): FoodDao {
+        return db.foodDao()
+    }
+
+    @Provides
+    @Singleton
     fun provideFirebaseAuth(): FirebaseAuth {
         return FirebaseAuth.getInstance()
     }
@@ -65,5 +77,18 @@ object AppModule {
     @Singleton
     fun provideFirebaseFirestore(): FirebaseFirestore {
         return FirebaseFirestore.getInstance()
+    }
+    @Provides
+    @Singleton
+    fun provideNetworkConnectivityObserver(
+        @ApplicationContext context: Context
+    ): NetworkConnectivityObserver {
+        return NetworkConnectivityObserverImpl(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideWorkManager(@ApplicationContext context: Context): WorkManager {
+        return WorkManager.getInstance(context)
     }
 }
