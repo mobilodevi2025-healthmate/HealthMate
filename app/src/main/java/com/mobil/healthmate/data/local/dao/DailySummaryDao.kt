@@ -15,6 +15,12 @@ interface DailySummaryDao {
     @Query("SELECT * FROM daily_summaries WHERE userId = :uid AND date = :date")
     fun getSummaryByDate(uid: String, date: Long): Flow<DailySummaryEntity?>
 
+    @Query("SELECT * FROM daily_summaries WHERE userId = :userId AND date = :date LIMIT 1")
+    suspend fun getSummaryByLatestDate(userId: String, date: Long): DailySummaryEntity?
+
+    @Query("SELECT * FROM daily_summaries WHERE userId = :userId ORDER BY date DESC LIMIT 1")
+    suspend fun getLatestSummary(userId: String): DailySummaryEntity?
+
     @Query("SELECT * FROM daily_summaries WHERE userId = :uid ORDER BY date DESC LIMIT 7")
     fun getLast7DaysSummary(uid: String): Flow<List<DailySummaryEntity>>
 

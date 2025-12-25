@@ -21,6 +21,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.mobil.healthmate.domain.repository.HealthRepository
 import com.mobil.healthmate.domain.manager.StepSensorManager
+import com.mobil.healthmate.data.local.entity.DailySummaryEntity
+import kotlinx.coroutines.Dispatchers
+import java.util.Calendar // Calendar importunu unutma!
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
@@ -47,16 +50,88 @@ class ProfileViewModel @Inject constructor(
     private val _currentSteps = MutableStateFlow(0)
     val currentSteps = _currentSteps.asStateFlow()
 
+    // EKSİK OLAN 1: Haftalık veriler için MutableStateFlow
+    private val _weeklySummaries = MutableStateFlow<List<DailySummaryEntity>>(emptyList())
+    val weeklySummaries = _weeklySummaries.asStateFlow()
+
+    // EKSİK OLAN 2: Kalori için MutableStateFlow
+    private val _currentCalories = MutableStateFlow(0)
+    val currentCalories = _currentCalories.asStateFlow()
+
     init {
         loadProfileData()
         loadProfileImage()
         listenToSteps()
+        listenToWeeklyData()
+        listenToTodayCalories() // Kalori dinlemeyi başlat
     }
 
     private fun listenToSteps() {
+        val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             stepSensorManager.getStepCount().collect { steps ->
                 _currentSteps.value = steps
+                saveStepsToDb(uid, steps)
+            }
+        }
+    }
+
+    private fun listenToWeeklyData() {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            repository.getLast7DaysSummary(uid).collect { list ->
+                _weeklySummaries.value = list // Artık hata vermez
+            }
+        }
+    }
+
+    // YENİ EKLENEN FONKSİYON: Kaloriyi veritabanından anlık çeker
+    private fun listenToTodayCalories() {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            // Bugünün başlangıç zamanını bul (00:00)
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val todayStart = calendar.timeInMillis
+
+            // Repository'e eklediğimiz fonksiyonu kullanıyoruz
+            repository.getSummaryByDate(uid, todayStart).collect { summary ->
+                if (summary != null) {
+                    _currentCalories.value = summary.totalCaloriesConsumed
+                } else {
+                    _currentCalories.value = 0
+                }
+            }
+        }
+    }
+
+    private fun saveStepsToDb(uid: String, steps: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val todaySummary = repository.getTodaySummary(uid)
+
+                if (todaySummary != null) {
+                    val updatedSummary = todaySummary.copy(
+                        totalSteps = steps,
+                        updatedAt = System.currentTimeMillis(),
+                        isSynced = false
+                    )
+                    repository.insertSummary(updatedSummary)
+                } else {
+                    val newSummary = DailySummaryEntity(
+                        userId = uid,
+                        date = System.currentTimeMillis(),
+                        totalSteps = steps,
+                        isSynced = false
+                    )
+                    repository.insertSummary(newSummary)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -77,7 +152,6 @@ class ProfileViewModel @Inject constructor(
             if (path.isNotEmpty()) {
                 _profileImagePath.value = path
             }
-
             settingsManager.updateLastSyncTime(System.currentTimeMillis())
         }
     }
@@ -109,6 +183,9 @@ class ProfileViewModel @Inject constructor(
                     targetCalories = goal?.dailyCalorieTarget?.toString() ?: "",
                     dailyStepGoal = goal?.dailyStepTarget?.toString() ?: "10000",
 
+                    sleepTargetHours = goal?.dailySleepTarget?.toString() ?: "8.0",
+                    bedTime = goal?.bedTime ?: "23:00",
+
                     isLoading = false
                 )
             }.collect { newState ->
@@ -139,7 +216,6 @@ class ProfileViewModel @Inject constructor(
     private fun saveAllData(event: ProfileEvent.SaveProfile) {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
-            // 1. User Entity Oluştur
             val user = UserEntity(
                 userId = uid,
                 name = event.name,
@@ -158,6 +234,10 @@ class ProfileViewModel @Inject constructor(
                 targetWeight = event.targetWeight.toDoubleOrNull(),
                 dailyCalorieTarget = event.targetCalories.toIntOrNull() ?: 2000,
                 dailyStepTarget = event.dailyStepGoal.toIntOrNull() ?: 10000,
+
+                dailySleepTarget = event.sleepTargetHours.toDoubleOrNull() ?: 8.0,
+                bedTime = event.bedTime,
+
                 startDate = System.currentTimeMillis()
             )
             repository.insertGoal(goal)
@@ -201,6 +281,7 @@ class ProfileViewModel @Inject constructor(
     }
 }
 
+// ... Data Class ve Sealed Class'lar aynı kalabilir ...
 data class ProfileUiState(
     val name: String = "",
     val email: String = "",
@@ -213,6 +294,9 @@ data class ProfileUiState(
     val targetWeight: String = "",
     val targetCalories: String = "",
     val dailyStepGoal: String = "",
+
+    val sleepTargetHours: String = "8.0",
+    val bedTime: String = "23:00",
 
     val isLoading: Boolean = true
 )
@@ -227,7 +311,9 @@ sealed class ProfileEvent {
         val activityLevel: ActivityLevel,
         val targetWeight: String,
         val targetCalories: String,
-        val dailyStepGoal: String
+        val dailyStepGoal: String,
+        val sleepTargetHours: String,
+        val bedTime: String
     ) : ProfileEvent()
 
     object SignOut : ProfileEvent()
