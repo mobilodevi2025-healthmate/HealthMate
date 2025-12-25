@@ -30,21 +30,19 @@ interface MealDao {
     @Query("SELECT * FROM meals WHERE userId = :uid AND date BETWEEN :start AND :end ORDER BY date DESC")
     fun getMealsByDate(uid: String, start: Long, end: Long): Flow<List<MealWithFoods>>
 
-    // --- YENİ EKLENEN SENKRONİZASYON SORGULARI ---
+    @Query("SELECT * FROM meals WHERE date >= :startDate")
+    fun getMealsFromDate(startDate: Long): Flow<List<MealEntity>>
 
-    // 1. Gönderilmemiş YEMEKLERİ getir
+    // Senkronizasyon metodları
     @Query("SELECT * FROM meals WHERE isSynced = 0")
     suspend fun getUnsyncedMeals(): List<MealEntity>
 
-    // 2. Yemeği 'Senkronize' olarak işaretle (ID'nin String/UUID olduğunu varsayıyoruz)
     @Query("UPDATE meals SET isSynced = 1 WHERE mealId = :mealId")
     suspend fun markMealAsSynced(mealId: String)
 
-    // 3. Gönderilmemiş BESİNLERİ getir (Yemek gönderilse bile içine yeni besin eklenmiş olabilir)
     @Query("SELECT * FROM foods WHERE isSynced = 0")
     suspend fun getUnsyncedFoods(): List<FoodEntity>
 
-    // 4. Besini 'Senkronize' olarak işaretle
     @Query("UPDATE foods SET isSynced = 1 WHERE foodId = :foodId")
     suspend fun markFoodAsSynced(foodId: String)
 }
