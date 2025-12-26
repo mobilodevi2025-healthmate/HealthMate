@@ -14,7 +14,8 @@ import java.util.UUID
             entity = UserEntity::class,
             parentColumns = ["userId"],
             childColumns = ["userId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE,
+            deferred = true
         )
     ],
     indices = [Index(value = ["userId"])]
@@ -31,5 +32,7 @@ data class MealEntity(
     val fat: Double = 0.0,
     val notes: String? = null,
     val isSynced: Boolean = false,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false
+
 )

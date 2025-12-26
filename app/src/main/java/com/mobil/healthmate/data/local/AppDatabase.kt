@@ -15,7 +15,7 @@ import com.mobil.healthmate.data.local.entity.*
         FoodEntity::class,
         DailySummaryEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(AppConverters::class)

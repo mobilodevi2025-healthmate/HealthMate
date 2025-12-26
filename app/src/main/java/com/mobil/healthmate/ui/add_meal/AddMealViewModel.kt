@@ -5,17 +5,17 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.mobil.healthmate.data.local.entity.FoodEntity
 import com.mobil.healthmate.data.local.entity.MealEntity
-import com.mobil.healthmate.data.local.entity.DailySummaryEntity // Import Eklendi
+import com.mobil.healthmate.data.local.entity.DailySummaryEntity
 import com.mobil.healthmate.data.local.types.MealType
+import com.mobil.healthmate.domain.repository.HealthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import javax.inject.Inject
-import com.mobil.healthmate.domain.repository.HealthRepository
-import java.util.UUID
 import kotlinx.coroutines.flow.update
-import java.util.Calendar // Import Eklendi
+import kotlinx.coroutines.launch
+import java.util.UUID
+import java.util.Calendar
+import javax.inject.Inject
 
 @HiltViewModel
 class AddMealViewModel @Inject constructor(
@@ -29,12 +29,12 @@ class AddMealViewModel @Inject constructor(
     fun onEvent(event: AddMealEvent) {
         when(event) {
             is AddMealEvent.OnMealTypeChange -> {
-                _uiState.value = _uiState.value.copy(mealType = event.type)
+                _uiState.update { it.copy(mealType = event.type) }
             }
             is AddMealEvent.OnAddFood -> {
                 val currentList = _uiState.value.addedFoods.toMutableList()
                 currentList.add(event.food)
-                _uiState.value = _uiState.value.copy(addedFoods = currentList)
+                _uiState.update { it.copy(addedFoods = currentList) }
             }
             is AddMealEvent.SaveMeal -> {
                 saveMealToDatabase()
@@ -43,80 +43,75 @@ class AddMealViewModel @Inject constructor(
     }
 
     private fun saveMealToDatabase() {
+        val uid = auth.currentUser?.uid ?: return
+
         viewModelScope.launch {
-            val currentUser = repository.getCurrentUser()
+            _uiState.update { it.copy(isLoading = true) }
 
-            if (currentUser != null) {
-                val userId = currentUser.userId
-                val currentFoods = _uiState.value.addedFoods
+            val currentFoods = _uiState.value.addedFoods
+            if (currentFoods.isNotEmpty()) {
+                val totalCals = currentFoods.sumOf { it.calories }
+                val totalProt = currentFoods.sumOf { it.protein }
+                val totalCarb = currentFoods.sumOf { it.carbs }
+                val totalFat = currentFoods.sumOf { it.fat }
 
-                if (currentFoods.isNotEmpty()) {
+                val meal = MealEntity(
+                    mealId = UUID.randomUUID().toString(),
+                    userId = uid,
+                    mealType = _uiState.value.mealType,
+                    date = System.currentTimeMillis(),
+                    totalCalories = totalCals,
+                    protein = totalProt,
+                    carbs = totalCarb,
+                    fat = totalFat,
+                    isSynced = false,
+                    updatedAt = System.currentTimeMillis()
+                )
 
-                    val totalCals = currentFoods.sumOf { it.calories }
-                    val totalProt = currentFoods.sumOf { it.protein }
-                    val totalCarb = currentFoods.sumOf { it.carbs }
-                    val totalFat = currentFoods.sumOf { it.fat }
-
-                    val meal = MealEntity(
-                        mealId = UUID.randomUUID().toString(),
-                        userId = userId,
-                        mealType = _uiState.value.mealType,
-                        date = System.currentTimeMillis(),
-
-                        totalCalories = totalCals,
-                        protein = totalProt,
-                        carbs = totalCarb,
-                        fat = totalFat,
-
-                        isSynced = false
-                    )
-
-                    // 3. Yemeği Kaydet
-                    repository.insertMealWithFoods(meal, currentFoods)
-
-                    // 4. GÜNLÜK ÖZETİ GÜNCELLE (DÜZELTME 2 - Kalori Grafiği İçin)
-                    updateDailySummary(userId, totalCals)
-
-                    // 5. UI'ı Temizle
-                    _uiState.update { AddMealState() }
-                }
-            } else {
-                println("HATA: Kullanıcı bulunamadı, yemek kaydedilemedi.")
+                repository.insertMealWithFoods(meal, currentFoods)
+                updateDailySummary(uid, totalCals, totalProt.toFloat(), totalCarb.toFloat(), totalFat.toFloat())
+                _uiState.update { AddMealState() }
             }
+            _uiState.update { it.copy(isLoading = false) }
         }
     }
 
-    // YENİ EKLENEN FONKSİYON: Günlük Özet Tablosunu Günceller
-    private suspend fun updateDailySummary(userId: String, caloriesToAdd: Int) {
-        // Gün başlangıcını bul (Adım sayar ile aynı güne yazması için)
-        val calendar = Calendar.getInstance().apply {
+    private suspend fun updateDailySummary(
+        userId: String,
+        calories: Int,
+        protein: Float,
+        carbs: Float,
+        fat: Float
+    ) {
+        val todayDate = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-        }
-        val todayDate = calendar.timeInMillis
+        }.timeInMillis
 
-        // O güne ait bir özet var mı diye bak
-        // NOT: Repository'e getSummaryByDate fonksiyonunu eklemiş olman lazım (ProfileViewModel'de kullanmıştık)
-        val existingSummary = repository.getSummaryByDateDirect(userId, todayDate) // Flow olmayan, suspend versiyonu
+        val existingSummary = repository.getSummaryByDateDirect(userId, todayDate)
 
         if (existingSummary != null) {
-            // Varsa üzerine ekle (Adım sayısını koru!)
             val updatedSummary = existingSummary.copy(
-                totalCaloriesConsumed = existingSummary.totalCaloriesConsumed + caloriesToAdd,
+                totalCaloriesConsumed = existingSummary.totalCaloriesConsumed + calories,
+                totalProtein = existingSummary.totalProtein + protein,
+                totalCarbs = existingSummary.totalCarbs + carbs,
+                totalFat = existingSummary.totalFat + fat,
                 updatedAt = System.currentTimeMillis(),
                 isSynced = false
             )
             repository.insertSummary(updatedSummary)
         } else {
-            // Yoksa sıfırdan oluştur
             val newSummary = DailySummaryEntity(
-                date = todayDate, // timeInMillis değil, gün başlangıcı olmalı
                 userId = userId,
-                totalCaloriesConsumed = caloriesToAdd,
-                totalSteps = 0, // Adım henüz yok
-                isSynced = false
+                date = todayDate,
+                totalCaloriesConsumed = calories,
+                totalProtein = protein,
+                totalCarbs = carbs,
+                totalFat = fat,
+                isSynced = false,
+                updatedAt = System.currentTimeMillis()
             )
             repository.insertSummary(newSummary)
         }

@@ -14,7 +14,7 @@ import java.util.UUID
             entity = UserEntity::class,
             parentColumns = ["userId"],
             childColumns = ["userId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE,
         )
     ],
     indices = [Index(value = ["userId"])]
@@ -27,26 +27,20 @@ data class GoalEntity(
 
     val mainGoalType: GoalType,
 
-    // --- Fiziksel Hedefler (Opsiyonel) ---
     val targetWeight: Double? = null,
     val startWeight: Double? = null,
 
-    // --- Günlük Aktivite Hedefleri ---
     val dailyCalorieTarget: Int? = null,
     val dailyStepTarget: Int? = null,
     val dailyWaterTarget: Int? = null,
 
-    // Zaten vardı, bu hedef uyku süresidir (Örn: 8.0 saat)
     val dailySleepTarget: Double? = null,
 
-    // --- YENİ EKLENEN: Yatış Saati (Alarm İçin) ---
     val bedTime: String? = "23:00",
 
-    // --- Aralıklı Oruç (Fasting) Saatleri ---
     val fastingWindowStart: String? = null,
     val fastingWindowEnd: String? = null,
 
-    // --- Plan Durumu ---
     val startDate: Long = System.currentTimeMillis(),
     val endDate: Long? = null,
     val isActive: Boolean = true,

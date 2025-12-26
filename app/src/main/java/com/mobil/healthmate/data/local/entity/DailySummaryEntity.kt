@@ -13,7 +13,8 @@ import java.util.UUID
             entity = UserEntity::class,
             parentColumns = ["userId"],
             childColumns = ["userId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE,
+            deferred = true
         )
     ],
     indices = [Index(value = ["userId", "date"], unique = true)]

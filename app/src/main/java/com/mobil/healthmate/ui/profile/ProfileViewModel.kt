@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.mobil.healthmate.data.local.entity.DailySummaryEntity
 import com.mobil.healthmate.data.local.entity.GoalEntity
 import com.mobil.healthmate.data.local.entity.UserEntity
@@ -16,6 +15,7 @@ import com.mobil.healthmate.data.local.manager.ImageStorageManager
 import com.mobil.healthmate.data.local.manager.SettingsManager
 import com.mobil.healthmate.domain.manager.StepSensorManager
 import com.mobil.healthmate.domain.repository.HealthRepository
+import com.mobil.healthmate.domain.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -23,6 +23,8 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 import javax.inject.Inject
+import java.util.UUID
+import kotlinx.coroutines.launch
 
 data class DailyMacroStats(
     val date: Long,
@@ -31,11 +33,39 @@ data class DailyMacroStats(
     val totalFat: Float
 )
 
+data class ProfileUiState(
+    val name: String = "",
+    val email: String = "",
+    val age: String = "",
+    val height: String = "",
+    val weight: String = "",
+    val gender: Gender = Gender.MALE,
+    val activityLevel: ActivityLevel = ActivityLevel.MODERATELY_ACTIVE,
+    val targetWeight: String = "",
+    val targetCalories: String = "",
+    val dailyStepGoal: String = "",
+    val sleepTargetHours: String = "8.0",
+    val bedTime: String = "23:00",
+    val currentCalories: Int = 0,
+    val weeklySummaries: List<DailySummaryEntity> = emptyList(),
+    val weeklyMacros: List<DailyMacroStats> = emptyList(),
+    val isLoading: Boolean = true
+)
+
+sealed class ProfileEvent {
+    data class SaveProfile(
+        val name: String, val age: String, val height: String, val weight: String,
+        val gender: Gender, val activityLevel: ActivityLevel, val targetWeight: String,
+        val targetCalories: String, val dailyStepGoal: String, val sleepTargetHours: String, val bedTime: String
+    ) : ProfileEvent()
+    object SignOut : ProfileEvent()
+}
+
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val repository: HealthRepository,
+    private val syncRepository: SyncRepository,
     private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore,
     private val imageStorageManager: ImageStorageManager,
     private val settingsManager: SettingsManager,
     private val stepSensorManager: StepSensorManager
@@ -55,7 +85,6 @@ class ProfileViewModel @Inject constructor(
     private val _isUserExisting = MutableStateFlow(true)
     val isUserExisting = _isUserExisting.asStateFlow()
 
-    // UI State: Veritabanındaki tüm değişimleri anlık olarak birleştirip UI'ya sunar.
     val uiState: StateFlow<ProfileUiState> = combine(
         repository.getUser(uid),
         repository.getActiveGoal(uid),
@@ -66,9 +95,14 @@ class ProfileViewModel @Inject constructor(
 
         _isUserExisting.value = user != null
 
-        // Senkronizasyon sırasında grafiklerin sönmemesi için liste kontrolü
-        val finalSummaries = summaries.ifEmpty { emptyList() }
-        val finalMacros = macros.ifEmpty { emptyList() }
+        val calculatedMacros = summaries.map { summary ->
+            DailyMacroStats(
+                date = summary.date,
+                totalProtein = summary.totalProtein,
+                totalCarbs = summary.totalCarbs,
+                totalFat = summary.totalFat
+            )
+        }
 
         ProfileUiState(
             name = user?.name ?: "",
@@ -83,8 +117,9 @@ class ProfileViewModel @Inject constructor(
             dailyStepGoal = goal?.dailyStepTarget?.toString() ?: "10000",
             sleepTargetHours = goal?.dailySleepTarget?.toString() ?: "8.0",
             bedTime = goal?.bedTime ?: "23:00",
-            weeklySummaries = finalSummaries,
-            weeklyMacros = finalMacros,
+            weeklySummaries = summaries,
+            weeklyMacros = calculatedMacros,
+
             currentCalories = todaySummary?.totalCaloriesConsumed ?: 0,
             isLoading = false
         )
@@ -97,6 +132,7 @@ class ProfileViewModel @Inject constructor(
     init {
         loadProfileImage()
         listenToSteps()
+        syncRepository.triggerSync()
     }
 
     private fun getWeeklySummariesFlow(): Flow<List<DailySummaryEntity>> {
@@ -127,7 +163,6 @@ class ProfileViewModel @Inject constructor(
     }
 
     private fun generateFullWeekMacros(meals: List<com.mobil.healthmate.data.local.entity.MealEntity>, startOfWeek: Long): List<DailyMacroStats> {
-        // Tarihleri normalleştirerek grupla (Birden fazla Perşembe oluşmasını engeller)
         val grouped = meals.groupBy { truncateToStartOfDay(it.date) }
         return (0..6).map { offset ->
             val dayMillis = startOfWeek + (offset * 24 * 60 * 60 * 1000L)
@@ -152,14 +187,30 @@ class ProfileViewModel @Inject constructor(
 
     private fun saveStepsToDb(uid: String, steps: Int) {
         viewModelScope.launch(Dispatchers.IO) {
+            val currentUser = repository.getUserDirect(uid)
+
+            if (currentUser == null) return@launch
+
             val todayStart = getStartOfDayMillis()
             val todaySummary = repository.getSummaryByDateDirect(uid, todayStart)
-            if (todaySummary != null) {
-                // Upsert mantığı ile güncelle
-                repository.insertSummary(todaySummary.copy(totalSteps = steps, updatedAt = System.currentTimeMillis()))
+
+            val summaryToSave = if (todaySummary != null) {
+                todaySummary.copy(
+                    totalSteps = steps,
+                    updatedAt = System.currentTimeMillis(),
+                    isSynced = false
+                )
             } else {
-                repository.insertSummary(DailySummaryEntity(userId = uid, date = todayStart, totalSteps = steps))
+                DailySummaryEntity(
+                    userId = uid,
+                    date = todayStart,
+                    totalSteps = steps,
+                    updatedAt = System.currentTimeMillis(),
+                    isSynced = false
+                )
             }
+
+            repository.insertSummary(summaryToSave)
         }
     }
 
@@ -172,34 +223,53 @@ class ProfileViewModel @Inject constructor(
 
     private fun saveAllData(event: ProfileEvent.SaveProfile) {
         viewModelScope.launch {
-            val user = UserEntity(
-                userId = uid, name = event.name, email = auth.currentUser?.email ?: "",
-                age = event.age.toIntOrNull() ?: 25, height = event.height.toDoubleOrNull() ?: 170.0,
-                weight = event.weight.toDoubleOrNull() ?: 70.0, gender = event.gender, activityLevel = event.activityLevel
-            )
-            val goal = GoalEntity(
-                userId = uid, mainGoalType = GoalType.MAINTAIN_WEIGHT, targetWeight = event.targetWeight.toDoubleOrNull(),
-                dailyCalorieTarget = event.targetCalories.toIntOrNull() ?: 2000, dailyStepTarget = event.dailyStepGoal.toIntOrNull() ?: 10000,
-                dailySleepTarget = event.sleepTargetHours.toDoubleOrNull() ?: 8.0, bedTime = event.bedTime, startDate = System.currentTimeMillis()
-            )
+            try {
+                val targetGoalId = uid
 
-            // DAO'larda 'upsert' (Insert IGNORE + Update) mantığı çalıştığı için
-            // ilişkili veriler (yemek geçmişi) silinmez.
-            repository.insertUser(user)
-            repository.insertGoal(goal)
+                val user = UserEntity(
+                    userId = uid,
+                    name = event.name,
+                    email = auth.currentUser?.email ?: "",
+                    age = event.age.toIntOrNull() ?: 25,
+                    height = event.height.toDoubleOrNull() ?: 170.0,
+                    weight = event.weight.toDoubleOrNull() ?: 70.0,
+                    gender = event.gender,
+                    activityLevel = event.activityLevel,
+                    isSynced = false,
+                    updatedAt = System.currentTimeMillis()
+                )
 
-            launch(Dispatchers.IO) { saveUserToFirestore(user, goal) }
+                val goal = GoalEntity(
+                    goalId = targetGoalId,
+                    userId = uid,
+                    mainGoalType = GoalType.MAINTAIN_WEIGHT,
+                    targetWeight = event.targetWeight.toDoubleOrNull(),
+                    dailyCalorieTarget = event.targetCalories.toIntOrNull() ?: 2000,
+                    dailyStepTarget = event.dailyStepGoal.toIntOrNull() ?: 10000,
+                    dailySleepTarget = event.sleepTargetHours.toDoubleOrNull() ?: 8.0,
+                    dailyWaterTarget = (event.dailyStepGoal.toIntOrNull() ?: 10000) / 400 + 1,
+                    bedTime = event.bedTime,
+                    startDate = repository.getCurrentGoal(uid)?.startDate ?: System.currentTimeMillis(),
+                    isActive = true,
+                    isSynced = false,
+                    updatedAt = System.currentTimeMillis()
+                )
 
-            _isEditing.value = false
+                repository.insertUser(user)
+
+                Log.d("ProfileViewModel", "Yerel Kayıt Başlıyor: ID=${goal.goalId}, Adım=${goal.dailyStepTarget}")
+                repository.insertGoal(goal)
+
+                _isEditing.value = false
+
+                Log.d("ProfileViewModel", "Sync Tetikleniyor...")
+                syncRepository.triggerSync()
+
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Veri kaydetme hatası: ${e.localizedMessage}")
+            }
         }
     }
-
-    fun toggleEditMode() { _isEditing.value = !_isEditing.value }
-
-    fun cancelEdit() { _isEditing.value = false }
-
-    // --- YARDIMCI ZAMAN FONKSİYONLARI (Rasyonel Normalizasyon İçin) ---
-
     private fun getStartOfWeekMillis(): Long {
         return Calendar.getInstance(Locale("tr")).apply {
             firstDayOfWeek = Calendar.MONDAY
@@ -248,40 +318,6 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    private fun saveUserToFirestore(user: UserEntity, goal: GoalEntity) {
-        val userMap = hashMapOf(
-            "userId" to user.userId, "name" to user.name, "email" to user.email,
-            "targetWeight" to (goal.targetWeight ?: 0.0), "dailyCalorieTarget" to goal.dailyCalorieTarget,
-            "updatedAt" to System.currentTimeMillis()
-        )
-        firestore.collection("users").document(user.userId).set(userMap)
-    }
-}
-
-data class ProfileUiState(
-    val name: String = "",
-    val email: String = "",
-    val age: String = "",
-    val height: String = "",
-    val weight: String = "",
-    val gender: Gender = Gender.MALE,
-    val activityLevel: ActivityLevel = ActivityLevel.MODERATELY_ACTIVE,
-    val targetWeight: String = "",
-    val targetCalories: String = "",
-    val dailyStepGoal: String = "",
-    val sleepTargetHours: String = "8.0",
-    val bedTime: String = "23:00",
-    val currentCalories: Int = 0,
-    val weeklySummaries: List<DailySummaryEntity> = emptyList(),
-    val weeklyMacros: List<DailyMacroStats> = emptyList(),
-    val isLoading: Boolean = true
-)
-
-sealed class ProfileEvent {
-    data class SaveProfile(
-        val name: String, val age: String, val height: String, val weight: String,
-        val gender: Gender, val activityLevel: ActivityLevel, val targetWeight: String,
-        val targetCalories: String, val dailyStepGoal: String, val sleepTargetHours: String, val bedTime: String
-    ) : ProfileEvent()
-    object SignOut : ProfileEvent()
+    fun toggleEditMode() { _isEditing.value = !_isEditing.value }
+    fun cancelEdit() { _isEditing.value = false }
 }

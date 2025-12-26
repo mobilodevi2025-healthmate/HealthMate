@@ -1,18 +1,13 @@
 package com.mobil.healthmate.data.local.dao
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Update
-import androidx.room.Transaction
+import androidx.room.*
 import com.mobil.healthmate.data.local.entity.GoalEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GoalDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertGoal(goal: GoalEntity) : Long
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertGoal(goal: GoalEntity): Long
 
     @Update
     suspend fun updateGoal(goal: GoalEntity)
@@ -25,11 +20,8 @@ interface GoalDao {
         }
     }
 
-    @Query("SELECT * FROM goals WHERE userId = :uid AND isActive = 1 ORDER BY startDate DESC LIMIT 1")
+    @Query("SELECT * FROM goals WHERE userId = :uid AND isActive = 1 LIMIT 1")
     fun getActiveGoal(uid: String): Flow<GoalEntity?>
-
-    @Query("SELECT * FROM goals WHERE userId = :uid ORDER BY startDate DESC")
-    fun getAllGoals(uid: String): Flow<List<GoalEntity>>
 
     @Query("SELECT * FROM goals WHERE userId = :userId AND isActive = 1 LIMIT 1")
     suspend fun getCurrentGoal(userId: String): GoalEntity?

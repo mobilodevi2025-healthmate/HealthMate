@@ -14,7 +14,8 @@ import java.util.UUID
             entity = MealEntity::class,
             parentColumns = ["mealId"],
             childColumns = ["parentMealId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE,
+            deferred = true
         )
     ],
     indices = [Index(value = ["parentMealId"])]
@@ -30,17 +31,14 @@ data class FoodEntity(
 
     val userId: String,
 
-    val unit: FoodUnit, // Değiştirildi: Enum kullanımı
+    val unit: FoodUnit,
 
     val calories: Int,
     val protein: Double,
     val carbs: Double,
     val fat: Double,
-    // --- SENKRONİZASYON İÇİN GEREKLİ ALANLAR (YENİ) ---
 
-    // Dirty Flag: true = Bulutla eşit, false = Gönderilmeyi bekliyor
     val isSynced: Boolean = false,
 
-    // Çakışma Çözümü: Son güncelleme zamanı
     val updatedAt: Long = System.currentTimeMillis()
 )
