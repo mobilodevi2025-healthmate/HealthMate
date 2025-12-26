@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +63,7 @@ fun LoginScreen(
         }
     }
 
+    // Yönlendirme Mantığı
     LaunchedEffect(state.isUserExisting) {
         when (state.isUserExisting) {
             true -> onNavigateToHome()
@@ -92,10 +92,20 @@ fun LoginScreen(
             )
     ) {
         if (state.isLoading) {
-            CircularProgressIndicator(
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center)
-            )
+            // YÜKLEME EKRANI (Loading Message Eklendi)
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = state.loadingMessage, // "Veriler eşitleniyor..." yazar
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         } else {
             Column(
                 modifier = Modifier

@@ -102,21 +102,16 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // GÜNCELLENEN ÇIKIŞ BUTONU
         TextButton(
             onClick = {
-                // 1. Google İstemcisini Hazırla
                 val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                     .requestIdToken(context.getString(R.string.default_web_client_id))
                     .requestEmail()
                     .build()
                 val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
-                // 2. Google'dan Çıkış Yap
                 googleSignInClient.signOut().addOnCompleteListener {
-                    // 3. Firebase'den Çıkış Yap
                     FirebaseAuth.getInstance().signOut()
-                    // 4. Login Ekranına Yönlendir
                     onSignOut()
                 }
             },
