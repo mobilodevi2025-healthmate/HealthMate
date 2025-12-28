@@ -171,18 +171,32 @@ fun AddMealScreen(
             Button(
                 onClick = {
                     if (foodName.isNotBlank() && calorie.isNotBlank()) {
-                        val newFood = FoodEntity(
-                            parentMealId = 0,
-                            name = foodName,
+                        // 1. Önce kullanıcının girdiği ham değerleri al
+                        val inputQty = quantity.toDoubleOrNull() ?: 1.0
+                        val unitCalorie = calorie.toIntOrNull() ?: 0
+                        val unitProtein = protein.toDoubleOrNull() ?: 0.0
+                        val unitCarbs = carbs.toDoubleOrNull() ?: 0.0
+                        val unitFat = fat.toDoubleOrNull() ?: 0.0
 
-                            quantity = quantity.toDoubleOrNull() ?: 1.0,
+                        val totalCalorie = (unitCalorie * inputQty).toInt()
+                        val totalProtein = unitProtein * inputQty
+                        val totalCarbs = unitCarbs * inputQty
+                        val totalFat = unitFat * inputQty
+
+                        val newFood = FoodEntity(
+                            parentMealId = "0",
+                            name = foodName,
+                            userId = "",
+
+                            quantity = inputQty,
                             unit = selectedUnit,
 
-                            calories = calorie.toIntOrNull() ?: 0,
-                            protein = protein.toDoubleOrNull() ?: 0.0,
-                            carbs = carbs.toDoubleOrNull() ?: 0.0,
-                            fat = fat.toDoubleOrNull() ?: 0.0
+                            calories = totalCalorie,
+                            protein = totalProtein,
+                            carbs = totalCarbs,
+                            fat = totalFat
                         )
+
                         viewModel.onEvent(AddMealEvent.OnAddFood(newFood))
 
                         foodName = ""
@@ -204,7 +218,7 @@ fun AddMealScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (state.addedFoods.isNotEmpty()) {
-                Text("Tabaktakiler (${state.addedFoods.sumOf { it.calories }} kcal)", fontWeight = FontWeight.Bold)
+                Text("Tabaktakiler (${state.addedFoods.sumOf { it.calories }.toString()} kcal)", fontWeight = FontWeight.Bold)
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     items(state.addedFoods) { food ->
                         Card(
@@ -241,20 +255,42 @@ fun AddMealScreen(
                 Spacer(modifier = Modifier.weight(1f))
             }
 
+            var isSaving by remember { mutableStateOf(false) }
+
             Button(
                 onClick = {
+                    // Eğer zaten basıldıysa (kaydediliyorsa) işlemi durdur.
+                    if (isSaving) return@Button
+
+                    // 2. Kilidi aktif et (Artık 2. kez basılamaz)
+                    isSaving = true
+
                     viewModel.onEvent(AddMealEvent.SaveMeal)
                     Toast.makeText(context, "Öğün başarıyla kaydedildi!", Toast.LENGTH_SHORT).show()
                     onNavigateBack()
                 },
+
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                enabled = state.addedFoods.isNotEmpty()
+
+                // 3. Yemek listesi boşsa VEYA kayıt yapılıyorsa butonu pasif yap
+                enabled = state.addedFoods.isNotEmpty() && !isSaving
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Öğünü Tamamla ve Kaydet")
+                // 4. Görsellik: Kaydedilirken yükleniyor göstergesi çıkabilir (Opsiyonel)
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Kaydediliyor...")
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Öğünü Tamamla ve Kaydet")
+                }
             }
         }
     }

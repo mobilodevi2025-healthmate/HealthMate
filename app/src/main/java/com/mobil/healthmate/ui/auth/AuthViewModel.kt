@@ -3,7 +3,7 @@ package com.mobil.healthmate.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mobil.healthmate.domain.repository.AuthRepository
-import com.mobil.healthmate.domain.repository.HealthRepository // YENİ EKLENDİ
+import com.mobil.healthmate.domain.repository.SyncRepository
 import com.mobil.healthmate.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +16,7 @@ import javax.inject.Inject
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val healthRepository: HealthRepository
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthState())
@@ -30,7 +30,7 @@ class AuthViewModel @Inject constructor(
                 is Resource.Success -> {
                     val user = result.data
                     if (user != null) {
-                        checkUserAndRestore(user.uid)
+                        handleUserNavigationAndSync(user.uid)
                     } else {
                         _state.update { it.copy(isLoading = false, error = "Kullanıcı bilgisi alınamadı") }
                     }
@@ -48,23 +48,27 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    private fun checkUserAndRestore(uid: String) {
+    private fun handleUserNavigationAndSync(uid: String) {
         viewModelScope.launch {
             try {
-                val isRestored = healthRepository.restoreUserProfileFromCloud(uid)
+                val isProfileRestored = syncRepository.downloadUserProfile(uid)
+
+                if (isProfileRestored) {
+                    syncRepository.triggerSync()
+                }
 
                 _state.update {
                     it.copy(
                         isLoading = false,
                         user = authRepository.getCurrentUser(),
-                        isUserExisting = isRestored // True ise Home, False ise CreateProfile
+                        isUserExisting = isProfileRestored
                     )
                 }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        error = "Profil senkronizasyon hatası: ${e.localizedMessage}"
+                        error = "Senkronizasyon başlatılamadı: ${e.localizedMessage}"
                     )
                 }
             }

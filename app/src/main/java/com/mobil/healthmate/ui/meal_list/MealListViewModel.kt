@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.mobil.healthmate.data.local.relation.MealWithFoods
 import com.mobil.healthmate.domain.repository.HealthRepository
+import com.mobil.healthmate.domain.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,7 @@ import javax.inject.Inject
 @HiltViewModel
 class MealListViewModel @Inject constructor(
     private val repository: HealthRepository,
+    private val syncRepository: SyncRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() {
 
@@ -22,6 +24,7 @@ class MealListViewModel @Inject constructor(
 
     init {
         loadMeals()
+        syncRepository.triggerSync()
     }
 
     private fun loadMeals() {

@@ -1,90 +1,200 @@
 package com.mobil.healthmate.data.repository
 
-import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
+import androidx.work.*
 import com.mobil.healthmate.data.local.dao.*
 import com.mobil.healthmate.data.local.entity.*
 import com.mobil.healthmate.data.local.relation.MealWithFoods
-import com.mobil.healthmate.data.local.types.ActivityLevel
-import com.mobil.healthmate.data.local.types.Gender
-import com.mobil.healthmate.data.local.types.GoalType
+import com.mobil.healthmate.data.worker.SyncWorker
+import com.mobil.healthmate.data.manager.GeminiManager
+
 import com.mobil.healthmate.domain.repository.HealthRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 
 class HealthRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
-    private val mealDao: MealDao,
     private val goalDao: GoalDao,
-    private val summaryDao: DailySummaryDao,
-    private val firestore: FirebaseFirestore
+    private val mealDao: MealDao,
+    private val foodDao: FoodDao,
+    private val dailySummaryDao: DailySummaryDao,
+    private val workManager: WorkManager,
+    private val geminiManager: GeminiManager
+
 ) : HealthRepository {
 
     override fun getUser(uid: String): Flow<UserEntity?> = userDao.getUser(uid)
 
-    override suspend fun insertUser(user: UserEntity) = userDao.insertUser(user)
-
-    override suspend fun insertMealWithFoods(meal: MealEntity, foods: List<FoodEntity>) {
-        val mealId = mealDao.insertMeal(meal)
-        val foodsWithId = foods.map { it.copy(parentMealId = mealId.toInt()) }
-        mealDao.insertFoods(foodsWithId)
+    override suspend fun insertUser(user: UserEntity) {
+        val userToSave = user.copy(isSynced = false, updatedAt = System.currentTimeMillis())
+        userDao.upsertUser(userToSave)
+        triggerImmediateSync()
     }
 
-    override suspend fun deleteMeal(meal: MealEntity) = mealDao.deleteMeal(meal)
-
-    override fun getMealsWithFoods(uid: String): Flow<List<MealWithFoods>> {
-        return mealDao.getMealsWithFoods(uid)
-    }
+    override suspend fun getCurrentUser(): UserEntity? = userDao.getCurrentUser()
 
     override fun getActiveGoal(uid: String): Flow<GoalEntity?> = goalDao.getActiveGoal(uid)
 
-    override suspend fun insertGoal(goal: GoalEntity) = goalDao.insertGoal(goal)
+    override suspend fun insertGoal(goal: GoalEntity) {
+        val goalToSave = goal.copy(isSynced = false, updatedAt = System.currentTimeMillis())
 
-    override fun getLast7DaysSummary(uid: String): Flow<List<DailySummaryEntity>> {
-        return summaryDao.getLast7DaysSummary(uid)
+        Log.d("DB_KAYIT", "Hedef Kaydediliyor: ID=${goalToSave.goalId}, Adım=${goalToSave.dailyStepTarget}, isSynced=${goalToSave.isSynced}")
+
+        goalDao.upsertGoal(goalToSave)
+
+        val verify = goalDao.getCurrentGoal(goal.userId)
+        Log.d("DB_KAYIT", "DB'den Doğrulanan: ID=${verify?.goalId}, Adım=${verify?.dailyStepTarget}, isSynced=${verify?.isSynced}")
+
+        triggerImmediateSync()
     }
 
-    override suspend fun restoreUserProfileFromCloud(uid: String): Boolean {
-        return try {
-            val document = firestore.collection("users").document(uid).get().await()
+    override suspend fun getCurrentGoal(userId: String): GoalEntity? = goalDao.getCurrentGoal(userId)
 
-            if (document.exists()) {
-                val data = document.data ?: return false
+    override suspend fun insertSummary(summary: DailySummaryEntity) {
+        val summaryToSave = summary.copy(isSynced = false, updatedAt = System.currentTimeMillis())
+        dailySummaryDao.upsertSummary(summaryToSave)
+        triggerImmediateSync()
+    }
+    override suspend fun getAiRecommendation(): String {
+        // 1. KULLANICI BİLGİLERİNİ ÇEK
+        val user = userDao.getCurrentUser() ?: return "Önce profil oluşturmalısın! 🛑"
+        val goal = goalDao.getCurrentGoal(user.userId)
 
-                val user = UserEntity(
-                    userId = uid,
-                    name = data["name"] as? String ?: "",
-                    email = data["email"] as? String ?: "",
-                    age = (data["age"] as? Long)?.toInt() ?: 25,
-                    height = (data["height"] as? Double) ?: 170.0,
-                    weight = (data["weight"] as? Double) ?: 70.0,
-                    gender = try {
-                        Gender.valueOf(data["gender"] as? String ?: "MALE")
-                    } catch (e: Exception) { Gender.MALE },
-                    activityLevel = try {
-                        ActivityLevel.valueOf(data["activityLevel"] as? String ?: "MODERATELY_ACTIVE")
-                    } catch (e: Exception) { ActivityLevel.MODERATELY_ACTIVE }
-                )
+        val userStats = """
+            - İsim: ${user.name}
+            - Yaş: ${user.age}, Cinsiyet: ${user.gender}
+            - Boy: ${user.height} cm, Kilo: ${user.weight} kg
+            - Aktivite Seviyesi: ${user.activityLevel}
+            - Hedef: ${goal?.mainGoalType ?: "Bilinmiyor"}
+        """.trimIndent()
 
-                val goal = GoalEntity(
-                    userId = uid,
-                    mainGoalType = GoalType.MAINTAIN_WEIGHT,
-                    targetWeight = (data["targetWeight"] as? Double),
-                    dailyCalorieTarget = (data["dailyCalorieTarget"] as? Long)?.toInt() ?: 2000,
-                    dailyStepTarget = (data["dailyStepTarget"] as? Long)?.toInt() ?: 10000,
-                    startDate = System.currentTimeMillis()
-                )
+        // 2. SON 3 GÜNÜN YEMEKLERİNİ ÇEK
+        val threeDaysAgo = System.currentTimeMillis() - (3 * 24 * 60 * 60 * 1000)
+        // DAO'ya eklediğimiz getMealsFromDateOneShot fonksiyonunu kullanıyoruz
+        val recentMeals = mealDao.getMealsFromDateOneShot(threeDaysAgo)
 
-                userDao.insertUser(user)
-                goalDao.insertGoal(goal)
-
-                true
-            } else {
-                false
+        val mealsString = if (recentMeals.isEmpty()) {
+            "Son 3 günde kayıtlı yemek bulunamadı."
+        } else {
+            val dateFormat = SimpleDateFormat("dd MMM HH:mm", Locale("tr"))
+            recentMeals.joinToString("\n") { meal ->
+                // Not: Burada meal.totalCalories var ama detaylı analiz için yemek ismini bilmek lazım.
+                // Eğer MealEntity içinde yemek ismi yoksa (Foods tablosundaysa),
+                // detaylı analiz için FoodDao'dan yemek isimlerini de çekmek gerekebilir.
+                // Şimdilik kalori ve tip üzerinden gidiyoruz.
+                "- ${dateFormat.format(meal.date)}: ${meal.mealType} öğünü, ${meal.totalCalories} kcal"
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
         }
+
+        // 3. GEMINI'YE GÖNDER
+        return geminiManager.generateDietRecommendation(userStats, mealsString)
+    }
+
+    override fun getWeeklySummaries(uid: String, startDate: Long): Flow<List<DailySummaryEntity>> {
+        return dailySummaryDao.getSummariesFromDate(uid, startDate)
+    }
+
+    override fun getSummaryByDate(uid: String, date: Long): Flow<DailySummaryEntity?> {
+        return dailySummaryDao.getSummaryByDate(uid, date)
+    }
+
+    override suspend fun getSummaryByDateDirect(userId: String, date: Long): DailySummaryEntity? {
+        return dailySummaryDao.getSummaryByDateDirect(userId, date)
+    }
+
+    override suspend fun getTodaySummary(userId: String): DailySummaryEntity? {
+        val todayStart = truncateToStartOfDay(System.currentTimeMillis())
+        return dailySummaryDao.getTodaySummary(userId, todayStart)
+    }
+
+    override suspend fun insertMealWithFoods(meal: MealEntity, foods: List<FoodEntity>) {
+        val mealToSave = meal.copy(isSynced = false, updatedAt = System.currentTimeMillis())
+        mealDao.upsertMeal(mealToSave)
+
+        val foodsWithCorrectId = foods.map { food ->
+            food.copy(
+                parentMealId = meal.mealId,
+                userId = meal.userId,
+                isSynced = false,
+                updatedAt = System.currentTimeMillis()
+            )
+        }
+        foodDao.insertFoods(foodsWithCorrectId)
+
+        val startOfDay = truncateToStartOfDay(meal.date)
+        val mealCalories = foods.sumOf { it.calories }
+        val mealProtein = foods.sumOf { it.protein }.toFloat()
+        val mealCarbs = foods.sumOf { it.carbs }.toFloat()
+        val mealFat = foods.sumOf { it.fat }.toFloat()
+
+        val existingSummary = dailySummaryDao.getSummaryByDateDirect(meal.userId, startOfDay)
+
+        if (existingSummary != null) {
+            val updatedSummary = existingSummary.copy(
+                totalCaloriesConsumed = existingSummary.totalCaloriesConsumed + mealCalories,
+                totalProtein = existingSummary.totalProtein + mealProtein,
+                totalCarbs = existingSummary.totalCarbs + mealCarbs,
+                totalFat = existingSummary.totalFat + mealFat,
+                updatedAt = System.currentTimeMillis(),
+                isSynced = false
+            )
+            dailySummaryDao.upsertSummary(updatedSummary)
+        } else {
+            val newSummary = DailySummaryEntity(
+                userId = meal.userId,
+                date = startOfDay,
+                totalCaloriesConsumed = mealCalories,
+                totalProtein = mealProtein,
+                totalCarbs = mealCarbs,
+                totalFat = mealFat,
+                isSynced = false,
+                updatedAt = System.currentTimeMillis()
+            )
+            dailySummaryDao.upsertSummary(newSummary)
+        }
+        triggerImmediateSync()
+    }
+
+    override suspend fun getUserDirect(uid: String): UserEntity? {
+        return userDao.getUserDirect(uid)
+    }
+
+    override suspend fun deleteMeal(meal: MealEntity) {
+        mealDao.softDeleteMeal(meal.mealId)
+        triggerImmediateSync()
+    }
+
+    override fun getMealsWithFoods(uid: String): Flow<List<MealWithFoods>> = mealDao.getMealsWithFoods(uid)
+
+    override fun getWeeklyMeals(startDate: Long): Flow<List<MealEntity>> = mealDao.getMealsFromDate(startDate)
+
+    private fun truncateToStartOfDay(millis: Long): Long {
+        return Calendar.getInstance().apply {
+            timeInMillis = millis
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    override fun triggerImmediateSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
+
+        workManager.enqueueUniqueWork(
+            "GlobalImmediateSync",
+            ExistingWorkPolicy.REPLACE,
+            syncRequest
+        )
     }
 }

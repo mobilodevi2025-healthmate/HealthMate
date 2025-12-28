@@ -3,11 +3,11 @@ package com.mobil.healthmate.ui.home
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AutoAwesome // <-- YENİ İKON
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -24,6 +24,7 @@ fun HomeScreen(
     onNavigateToMealList: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToGoals: () -> Unit,
+    onNavigateToAi: () -> Unit,
     onSignOut: () -> Unit
 ) {
     val context = LocalContext.current
@@ -57,6 +58,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // --- GÜNLÜK İŞLEMLER ---
         Text("Günlük İşlemler", style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -76,8 +78,9 @@ fun HomeScreen(
             Text("📋  Yemek Geçmişini Gör")
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
+        // --- AYARLAR & HEDEFLER ---
         Text("Ayarlar & Hedefler", style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -102,21 +105,35 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // GÜNCELLENEN ÇIKIŞ BUTONU
+        // --- YENİ EKLENEN BÖLÜM: YAPAY ZEKA ---
+        Text("Akıllı Asistan", style = MaterialTheme.typography.labelLarge)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = onNavigateToAi,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiary // Farklı renk ile dikkat çeksin
+            )
+        ) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("✨ AI Diyetisyen Tavsiyesi Al")
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // --- ÇIKIŞ BUTONU ---
         TextButton(
             onClick = {
-                // 1. Google İstemcisini Hazırla
                 val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                     .requestIdToken(context.getString(R.string.default_web_client_id))
                     .requestEmail()
                     .build()
                 val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
-                // 2. Google'dan Çıkış Yap
                 googleSignInClient.signOut().addOnCompleteListener {
-                    // 3. Firebase'den Çıkış Yap
                     FirebaseAuth.getInstance().signOut()
-                    // 4. Login Ekranına Yönlendir
                     onSignOut()
                 }
             },

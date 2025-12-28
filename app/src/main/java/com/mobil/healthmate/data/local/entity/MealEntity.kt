@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.mobil.healthmate.data.local.types.MealType
+import java.util.UUID
 
 @Entity(
     tableName = "meals",
@@ -13,22 +14,25 @@ import com.mobil.healthmate.data.local.types.MealType
             entity = UserEntity::class,
             parentColumns = ["userId"],
             childColumns = ["userId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE,
+            deferred = true
         )
     ],
     indices = [Index(value = ["userId"])]
 )
 data class MealEntity(
-    @PrimaryKey(autoGenerate = true)
-    val mealId: Int = 0,
-
+    @PrimaryKey
+    val mealId: String = UUID.randomUUID().toString(),
     val userId: String,
-
-    val mealType: MealType, // Değiştirildi: Enum kullanımı
-
+    val mealType: MealType,
     val date: Long,
-
     val totalCalories: Int = 0,
+    val protein: Double = 0.0,
+    val carbs: Double = 0.0,
+    val fat: Double = 0.0,
+    val notes: String? = null,
+    val isSynced: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false
 
-    val notes: String? = null
 )

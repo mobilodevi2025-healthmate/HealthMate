@@ -15,7 +15,7 @@ import com.mobil.healthmate.data.local.entity.*
         FoodEntity::class,
         DailySummaryEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(AppConverters::class)
@@ -24,4 +24,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun goalDao(): GoalDao
     abstract fun mealDao(): MealDao
     abstract fun dailySummaryDao(): DailySummaryDao
+    abstract fun foodDao(): FoodDao
 }
