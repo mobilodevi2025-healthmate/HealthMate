@@ -21,6 +21,7 @@ interface HealthRepository {
     suspend fun getTodaySummary(userId: String): DailySummaryEntity?
 
     suspend fun insertMealWithFoods(meal: MealEntity, foods: List<FoodEntity>)
+    suspend fun getAiRecommendation() : String
     suspend fun deleteMeal(meal: MealEntity)
     fun getMealsWithFoods(uid: String): Flow<List<MealWithFoods>>
     fun getWeeklyMeals(startDate: Long): Flow<List<MealEntity>>

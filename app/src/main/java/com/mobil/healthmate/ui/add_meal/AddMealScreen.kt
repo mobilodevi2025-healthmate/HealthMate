@@ -255,20 +255,42 @@ fun AddMealScreen(
                 Spacer(modifier = Modifier.weight(1f))
             }
 
+            var isSaving by remember { mutableStateOf(false) }
+
             Button(
                 onClick = {
+                    // Eğer zaten basıldıysa (kaydediliyorsa) işlemi durdur.
+                    if (isSaving) return@Button
+
+                    // 2. Kilidi aktif et (Artık 2. kez basılamaz)
+                    isSaving = true
+
                     viewModel.onEvent(AddMealEvent.SaveMeal)
                     Toast.makeText(context, "Öğün başarıyla kaydedildi!", Toast.LENGTH_SHORT).show()
                     onNavigateBack()
                 },
+
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                enabled = state.addedFoods.isNotEmpty()
+
+                // 3. Yemek listesi boşsa VEYA kayıt yapılıyorsa butonu pasif yap
+                enabled = state.addedFoods.isNotEmpty() && !isSaving
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Öğünü Tamamla ve Kaydet")
+                // 4. Görsellik: Kaydedilirken yükleniyor göstergesi çıkabilir (Opsiyonel)
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Kaydediliyor...")
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Öğünü Tamamla ve Kaydet")
+                }
             }
         }
     }

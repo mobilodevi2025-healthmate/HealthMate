@@ -44,6 +44,7 @@ import com.mobil.healthmate.receiver.NotificationReceiver
 import com.mobil.healthmate.ui.MainViewModel
 import com.mobil.healthmate.ui.Screen
 import com.mobil.healthmate.ui.add_meal.AddMealScreen
+import com.mobil.healthmate.ui.ai_advice.AiAdviceScreen
 import com.mobil.healthmate.ui.auth.LoginScreen
 import com.mobil.healthmate.ui.home.HomeScreen
 import com.mobil.healthmate.ui.meal_list.MealListScreen
@@ -176,6 +177,7 @@ class MainActivity : ComponentActivity() {
                                         onNavigateToMealList = { navController.navigate(Screen.MealList.route) },
                                         onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
                                         onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                                        onNavigateToAi = { navController.navigate("ai_advice") },
                                         onSignOut = {
                                             navController.navigate(Screen.Login.route) {
                                                 popUpTo(Screen.Home.route) { inclusive = true }
@@ -187,6 +189,9 @@ class MainActivity : ComponentActivity() {
                                 composable(route = Screen.AddMeal.route) { AddMealScreen(onNavigateBack = { navController.popBackStack() }) }
                                 composable(route = Screen.MealList.route) { MealListScreen(onNavigateBack = { navController.popBackStack() }) }
                                 composable(route = Screen.Goals.route) { GoalsScreen(onNavigateBack = { navController.popBackStack() }) }
+                                composable("ai_advice") {
+                                    AiAdviceScreen(onNavigateBack = { navController.popBackStack() })
+                                }
                             }
                         }
                     }
