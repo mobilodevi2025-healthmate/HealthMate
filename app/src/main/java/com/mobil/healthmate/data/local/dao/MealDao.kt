@@ -39,6 +39,9 @@ interface MealDao {
     @Query("SELECT * FROM meals WHERE isSynced = 0")
     suspend fun getUnsyncedMeals(): List<MealEntity>
 
+    @Query("SELECT * FROM meals WHERE date >= :startTime ORDER BY date DESC")
+    suspend fun getMealsFromDateOneShot(startTime: Long): List<MealEntity>
+
     @Query("UPDATE meals SET isSynced = 1 WHERE mealId = :mealId")
     suspend fun markMealAsSynced(mealId: String)
 

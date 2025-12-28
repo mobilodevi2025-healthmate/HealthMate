@@ -6,9 +6,13 @@ import com.mobil.healthmate.data.local.dao.*
 import com.mobil.healthmate.data.local.entity.*
 import com.mobil.healthmate.data.local.relation.MealWithFoods
 import com.mobil.healthmate.data.worker.SyncWorker
+import com.mobil.healthmate.data.manager.GeminiManager
+
 import com.mobil.healthmate.domain.repository.HealthRepository
 import kotlinx.coroutines.flow.Flow
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 
 class HealthRepositoryImpl @Inject constructor(
@@ -17,7 +21,9 @@ class HealthRepositoryImpl @Inject constructor(
     private val mealDao: MealDao,
     private val foodDao: FoodDao,
     private val dailySummaryDao: DailySummaryDao,
-    private val workManager: WorkManager
+    private val workManager: WorkManager,
+    private val geminiManager: GeminiManager
+
 ) : HealthRepository {
 
     override fun getUser(uid: String): Flow<UserEntity?> = userDao.getUser(uid)
@@ -51,6 +57,40 @@ class HealthRepositoryImpl @Inject constructor(
         val summaryToSave = summary.copy(isSynced = false, updatedAt = System.currentTimeMillis())
         dailySummaryDao.upsertSummary(summaryToSave)
         triggerImmediateSync()
+    }
+    override suspend fun getAiRecommendation(): String {
+        // 1. KULLANICI BİLGİLERİNİ ÇEK
+        val user = userDao.getCurrentUser() ?: return "Önce profil oluşturmalısın! 🛑"
+        val goal = goalDao.getCurrentGoal(user.userId)
+
+        val userStats = """
+            - İsim: ${user.name}
+            - Yaş: ${user.age}, Cinsiyet: ${user.gender}
+            - Boy: ${user.height} cm, Kilo: ${user.weight} kg
+            - Aktivite Seviyesi: ${user.activityLevel}
+            - Hedef: ${goal?.mainGoalType ?: "Bilinmiyor"}
+        """.trimIndent()
+
+        // 2. SON 3 GÜNÜN YEMEKLERİNİ ÇEK
+        val threeDaysAgo = System.currentTimeMillis() - (3 * 24 * 60 * 60 * 1000)
+        // DAO'ya eklediğimiz getMealsFromDateOneShot fonksiyonunu kullanıyoruz
+        val recentMeals = mealDao.getMealsFromDateOneShot(threeDaysAgo)
+
+        val mealsString = if (recentMeals.isEmpty()) {
+            "Son 3 günde kayıtlı yemek bulunamadı."
+        } else {
+            val dateFormat = SimpleDateFormat("dd MMM HH:mm", Locale("tr"))
+            recentMeals.joinToString("\n") { meal ->
+                // Not: Burada meal.totalCalories var ama detaylı analiz için yemek ismini bilmek lazım.
+                // Eğer MealEntity içinde yemek ismi yoksa (Foods tablosundaysa),
+                // detaylı analiz için FoodDao'dan yemek isimlerini de çekmek gerekebilir.
+                // Şimdilik kalori ve tip üzerinden gidiyoruz.
+                "- ${dateFormat.format(meal.date)}: ${meal.mealType} öğünü, ${meal.totalCalories} kcal"
+            }
+        }
+
+        // 3. GEMINI'YE GÖNDER
+        return geminiManager.generateDietRecommendation(userStats, mealsString)
     }
 
     override fun getWeeklySummaries(uid: String, startDate: Long): Flow<List<DailySummaryEntity>> {
